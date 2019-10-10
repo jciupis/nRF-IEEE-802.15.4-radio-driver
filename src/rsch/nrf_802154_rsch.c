@@ -455,7 +455,7 @@ bool nrf_802154_rsch_delayed_timeslot_request(uint32_t         t0,
 
         result = true;
     }
-    else if (requested_prio_lvl_is_at_least(RSCH_PRIO_MAX) &&
+    else if (requested_prio_lvl_is_at_least(RSCH_PRIO_IDLE_LISTENING) &&
              nrf_802154_timer_sched_time_is_in_future(now, t0, dt))
     {
         p_dly_ts->prio = prio;
@@ -466,6 +466,8 @@ bool nrf_802154_rsch_delayed_timeslot_request(uint32_t         t0,
         p_dly_ts->timer.dt        = dt;
         p_dly_ts->timer.callback  = delayed_timeslot_start;
         p_dly_ts->timer.p_context = (void *)dly_ts_id;
+
+        all_prec_update();
 
         nrf_802154_timer_sched_add(&p_dly_ts->timer, true);
 
