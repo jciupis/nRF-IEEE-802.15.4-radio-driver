@@ -642,13 +642,6 @@ static void sleep_init(void)
 /** Initialize Falling Asleep operation. */
 static void falling_asleep_init(void)
 {
-    if (!timeslot_is_granted())
-    {
-        sleep_init();
-        state_set(RADIO_STATE_SLEEP);
-        return;
-    }
-
     if (nrf_802154_trx_go_idle())
     {
         // There will be nrf_802154_trx_in_idle call, where we will continue processing
@@ -1511,8 +1504,16 @@ bool nrf_802154_core_sleep(nrf_802154_term_t term_lvl)
 
             if (result)
             {
-                state_set(RADIO_STATE_FALLING_ASLEEP);
-                falling_asleep_init();
+                if (!timeslot_is_granted())
+                {
+                    sleep_init();
+                    state_set(RADIO_STATE_SLEEP);
+                }
+                else
+                {
+                    state_set(RADIO_STATE_FALLING_ASLEEP);
+                    falling_asleep_init();
+                }
             }
         }
 
