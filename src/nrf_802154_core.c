@@ -200,12 +200,6 @@ static void received_frame_notify(uint8_t * p_data)
                                lqi_get(p_data));            // lqi
 }
 
-/** Allow nesting critical sections and notify MAC layer that a frame was received. */
-static void received_frame_notify_and_nesting_allow(uint8_t * p_data)
-{
-    received_frame_notify(p_data);
-}
-
 /** Notify MAC layer that receive procedure failed. */
 static void receive_failed_notify(nrf_802154_rx_error_t error)
 {
@@ -253,12 +247,6 @@ static void transmit_failed_notify(nrf_802154_tx_error_t error)
     {
         nrf_802154_notify_transmit_failed(p_frame, error);
     }
-}
-
-/** Allow nesting critical sections and notify MAC layer that transmission procedure failed. */
-static void transmit_failed_notify_and_nesting_allow(nrf_802154_tx_error_t error)
-{
-    transmit_failed_notify(error);
 }
 
 /** Notify MAC layer that energy detection procedure ended. */
@@ -830,14 +818,14 @@ static void on_timeslot_ended(void)
             case RADIO_STATE_TX_ACK:
                 state_set(RADIO_STATE_RX);
                 mp_current_rx_buffer->free = false;
-                received_frame_notify_and_nesting_allow(mp_current_rx_buffer->data);
+                received_frame_notify(mp_current_rx_buffer->data);
                 break;
 
             case RADIO_STATE_CCA_TX:
             case RADIO_STATE_TX:
             case RADIO_STATE_RX_ACK:
                 state_set(RADIO_STATE_RX);
-                transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_TIMESLOT_ENDED);
+                transmit_failed_notify(NRF_802154_TX_ERROR_TIMESLOT_ENDED);
                 break;
 
             case RADIO_STATE_ED:
@@ -889,14 +877,14 @@ static void on_preconditions_denied(radio_state_t state)
         case RADIO_STATE_TX_ACK:
             state_set(RADIO_STATE_RX);
             mp_current_rx_buffer->free = false;
-            received_frame_notify_and_nesting_allow(mp_current_rx_buffer->data);
+            received_frame_notify(mp_current_rx_buffer->data);
             break;
 
         case RADIO_STATE_CCA_TX:
         case RADIO_STATE_TX:
         case RADIO_STATE_RX_ACK:
             state_set(RADIO_STATE_RX);
-            transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_ABORTED);
+            transmit_failed_notify(NRF_802154_TX_ERROR_ABORTED);
             break;
 
         case RADIO_STATE_ED:
@@ -1161,7 +1149,7 @@ void nrf_802154_trx_receive_frame_received(void)
             nrf_802154_pib_promiscuous_get())
         {
             mp_current_rx_buffer->free = false;
-            received_frame_notify_and_nesting_allow(p_received_data);
+            received_frame_notify(p_received_data);
         }
 
         return;
@@ -1200,7 +1188,7 @@ void nrf_802154_trx_receive_frame_received(void)
                     state_set(RADIO_STATE_RX);
                     rx_init(true);
 
-                    received_frame_notify_and_nesting_allow(p_received_data);
+                    received_frame_notify(p_received_data);
                 }
             }
             else
@@ -1210,7 +1198,7 @@ void nrf_802154_trx_receive_frame_received(void)
                 state_set(RADIO_STATE_RX);
                 rx_init(true);
 
-                received_frame_notify_and_nesting_allow(p_received_data);
+                received_frame_notify(p_received_data);
             }
         }
         else
@@ -1228,7 +1216,7 @@ void nrf_802154_trx_receive_frame_received(void)
 
                 rx_init(true);
 
-                received_frame_notify_and_nesting_allow(p_received_data);
+                received_frame_notify(p_received_data);
             }
             else
             {
@@ -1280,7 +1268,7 @@ void nrf_802154_trx_transmit_ack_transmitted(void)
 
     rx_init(true);
 
-    received_frame_notify_and_nesting_allow(p_received_data);
+    received_frame_notify(p_received_data);
 }
 
 void nrf_802154_trx_transmit_frame_transmitted(void)
@@ -1404,7 +1392,7 @@ static void on_bad_ack(void)
 
     rx_init(true);
 
-    transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_INVALID_ACK);
+    transmit_failed_notify(NRF_802154_TX_ERROR_INVALID_ACK);
 }
 
 void nrf_802154_trx_receive_ack_received(void)
@@ -1444,7 +1432,7 @@ void nrf_802154_trx_transmit_frame_ccabusy(void)
     state_set(RADIO_STATE_RX);
     rx_init(true);
 
-    transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_BUSY_CHANNEL);
+    transmit_failed_notify(NRF_802154_TX_ERROR_BUSY_CHANNEL);
 }
 
 void nrf_802154_trx_energy_detection_finished(uint8_t ed_sample)
