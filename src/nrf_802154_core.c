@@ -203,21 +203,13 @@ static void received_frame_notify(uint8_t * p_data)
 /** Allow nesting critical sections and notify MAC layer that a frame was received. */
 static void received_frame_notify_and_nesting_allow(uint8_t * p_data)
 {
-    nrf_802154_critical_section_nesting_allow();
-
     received_frame_notify(p_data);
-
-    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that receive procedure failed. */
 static void receive_failed_notify(nrf_802154_rx_error_t error)
 {
-    nrf_802154_critical_section_nesting_allow();
-
     nrf_802154_notify_receive_failed(error);
-
-    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that transmission of requested frame has started. */
@@ -248,12 +240,8 @@ static void transmitted_frame_notify(uint8_t * p_ack, int8_t power, uint8_t lqi)
 {
     const uint8_t * p_frame = mp_tx_data;
 
-    nrf_802154_critical_section_nesting_allow();
-
     nrf_802154_core_hooks_transmitted(p_frame);
     nrf_802154_notify_transmitted(p_frame, p_ack, power, lqi);
-
-    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that transmission procedure failed. */
@@ -270,31 +258,19 @@ static void transmit_failed_notify(nrf_802154_tx_error_t error)
 /** Allow nesting critical sections and notify MAC layer that transmission procedure failed. */
 static void transmit_failed_notify_and_nesting_allow(nrf_802154_tx_error_t error)
 {
-    nrf_802154_critical_section_nesting_allow();
-
     transmit_failed_notify(error);
-
-    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that energy detection procedure ended. */
 static void energy_detected_notify(uint8_t result)
 {
-    nrf_802154_critical_section_nesting_allow();
-
     nrf_802154_notify_energy_detected(result);
-
-    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that CCA procedure ended. */
 static void cca_notify(bool result)
 {
-    nrf_802154_critical_section_nesting_allow();
-
     nrf_802154_notify_cca(result);
-
-    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Check if timeslot is currently granted.
@@ -672,7 +648,6 @@ static bool current_operation_terminate(nrf_802154_term_t term_lvl,
 /** Enter Sleep state. */
 static void sleep_init(void)
 {
-    nrf_802154_trx_disable();
     nrf_802154_timer_coord_stop();
 }
 

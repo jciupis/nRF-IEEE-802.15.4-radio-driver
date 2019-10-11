@@ -215,7 +215,7 @@ static inline void all_prec_update(void)
                 nrf_raal_continuous_mode_exit();
                 prec_approved_prio_set(RSCH_PREC_RAAL, RSCH_PRIO_IDLE);
             }
-            else
+            else if (prev_prio == RSCH_PRIO_IDLE)
             {
                 if (m_approved_prios[RSCH_PREC_HFCLK] == RSCH_PRIO_IDLE)
                 {
@@ -226,6 +226,10 @@ static inline void all_prec_update(void)
                 {
                     nrf_raal_continuous_mode_enter();
                 }
+            }
+            else
+            {
+                // Intentionally empty
             }
 
             nrf_802154_wifi_coex_prio_request(new_prio);

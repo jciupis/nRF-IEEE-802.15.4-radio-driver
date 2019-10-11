@@ -1913,7 +1913,7 @@ void nrf_802154_radio_irq_handler(void)
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_IRQ_HANDLER);
 
     // Prevent interrupting of this handler by requests from higher priority code.
-    nrf_802154_critical_section_forcefully_enter();
+    nrf_802154_critical_section_enter();
 
     if (nrf_radio_int_enable_check(NRF_RADIO_INT_ADDRESS_MASK) &&
         nrf_radio_event_check(NRF_RADIO_EVENT_ADDRESS))

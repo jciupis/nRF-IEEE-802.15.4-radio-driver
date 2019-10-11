@@ -64,30 +64,6 @@ bool nrf_802154_critical_section_enter(void);
 void nrf_802154_critical_section_exit(void);
 
 /**
- * @brief Function for forcefully entering a critical section in the 802.15.4 driver.
- *
- * With this function, the critical section is entered regardless of whether
- * it has been already entered before.
- *
- * This function is intended to be used by RADIO IRQ handler and RSCH notifications handlers to
- * prevent interrupting of these procedures by FSM requests from higher priority IRQ handlers.
- */
-void nrf_802154_critical_section_forcefully_enter(void);
-
-/**
- * @brief Allows entry to a nested critical section.
- *
- * This function is intended to be used with the notification module to allow processing
- * requests called from the notification context.
- */
-void nrf_802154_critical_section_nesting_allow(void);
-
-/**
- * @brief Denies entry to a nested critical section.
- */
-void nrf_802154_critical_section_nesting_deny(void);
-
-/**
  * @brief Checks if the critical section is nested.
  *
  * @retval true   Critical section is nested.
