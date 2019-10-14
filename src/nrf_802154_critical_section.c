@@ -126,11 +126,12 @@ static bool critical_section_enter(void)
         nrf_802154_critical_section_rsch_enter();
         nrf_802154_lp_timer_critical_section_enter();
         radio_critical_section_enter();
-        __DSB();
-        __ISB();
 
         m_nested_critical_section_counter         = counter;
         m_nested_critical_section_current_context = context;
+
+        __DSB();
+        __ISB();
 
         result = true;
     }
@@ -150,7 +151,7 @@ static void critical_section_exit(void)
     // Operate on local copy of the volatile variable for faster execution.
     counter = m_nested_critical_section_counter;
 
-    // Assert that every exit() call is paired with and enter() call
+    // Assert that every exit() call is paired with an enter() call
     assert(counter > 0);
 
     // Exit critical section only if it is not nested.
