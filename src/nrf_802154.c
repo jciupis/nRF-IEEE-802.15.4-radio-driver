@@ -161,6 +161,16 @@ int8_t nrf_802154_tx_power_get(void)
     return nrf_802154_pib_tx_power_get();
 }
 
+bool nrf_802154_coex_rx_request_mode_set(nrf_802154_coex_rx_request_mode_t mode)
+{
+    return nrf_802154_pib_coex_rx_request_mode_set(mode);
+}
+
+nrf_802154_coex_rx_request_mode_t nrf_802154_coex_rx_request_mode_get(void)
+{
+    return nrf_802154_pib_coex_rx_request_mode_get();
+}
+
 void nrf_802154_temperature_changed(void)
 {
     nrf_802154_request_cca_cfg_update();

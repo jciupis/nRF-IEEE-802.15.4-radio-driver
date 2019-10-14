@@ -48,15 +48,21 @@
 
 typedef struct
 {
-    int8_t               tx_power;                             ///< Transmit power.
-    uint8_t              pan_id[PAN_ID_SIZE];                  ///< Pan Id of this node.
-    uint8_t              short_addr[SHORT_ADDRESS_SIZE];       ///< Short Address of this node.
-    uint8_t              extended_addr[EXTENDED_ADDRESS_SIZE]; ///< Extended Address of this node.
-    nrf_802154_cca_cfg_t cca;                                  ///< CCA mode and thresholds.
-    bool                 promiscuous : 1;                      ///< Indicating if radio is in promiscuous mode.
-    bool                 auto_ack    : 1;                      ///< Indicating if auto ACK procedure is enabled.
-    bool                 pan_coord   : 1;                      ///< Indicating if radio is configured as the PAN coordinator.
-    uint8_t              channel     : 5;                      ///< Channel on which the node receives messages.
+    nrf_802154_coex_rx_request_mode_t rx_request_mode; ///< Coex request mode in receive operation.
+} nrf_802154_pib_coex_t;
+
+typedef struct
+{
+    int8_t                tx_power;                             ///< Transmit power.
+    uint8_t               pan_id[PAN_ID_SIZE];                  ///< Pan Id of this node.
+    uint8_t               short_addr[SHORT_ADDRESS_SIZE];       ///< Short Address of this node.
+    uint8_t               extended_addr[EXTENDED_ADDRESS_SIZE]; ///< Extended Address of this node.
+    nrf_802154_cca_cfg_t  cca;                                  ///< CCA mode and thresholds.
+    bool                  promiscuous : 1;                      ///< Indicating if radio is in promiscuous mode.
+    bool                  auto_ack    : 1;                      ///< Indicating if auto ACK procedure is enabled.
+    bool                  pan_coord   : 1;                      ///< Indicating if radio is configured as the PAN coordinator.
+    uint8_t               channel     : 5;                      ///< Channel on which the node receives messages.
+    nrf_802154_pib_coex_t coex;                                 ///< Coex-related fields.
 } nrf_802154_pib_data_t;
 
 // Static variables.
@@ -136,6 +142,8 @@ void nrf_802154_pib_init(void)
     m_data.cca.ed_threshold   = NRF_802154_CCA_ED_THRESHOLD_DEFAULT;
     m_data.cca.corr_threshold = NRF_802154_CCA_CORR_THRESHOLD_DEFAULT;
     m_data.cca.corr_limit     = NRF_802154_CCA_CORR_LIMIT_DEFAULT;
+
+    m_data.coex.rx_request_mode = NRF_802154_COEX_RX_REQUEST_MODE_DESTINED;
 }
 
 bool nrf_802154_pib_promiscuous_get(void)
@@ -248,4 +256,41 @@ void nrf_802154_pib_cca_cfg_set(const nrf_802154_cca_cfg_t * p_cca_cfg)
 void nrf_802154_pib_cca_cfg_get(nrf_802154_cca_cfg_t * p_cca_cfg)
 {
     memcpy(p_cca_cfg, &m_data.cca, sizeof(m_data.cca));
+}
+
+bool nrf_802154_pib_coex_rx_request_mode_is_supported(nrf_802154_coex_rx_request_mode_t mode)
+{
+    bool result = false;
+
+    switch (mode)
+    {
+        case NRF_802154_COEX_RX_REQUEST_MODE_DISABLED:
+        case NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION:
+        case NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE:
+        case NRF_802154_COEX_RX_REQUEST_MODE_DESTINED:
+            result = true;
+            break;
+
+        default:
+            break;
+    }
+
+    return result;
+}
+
+bool nrf_802154_pib_coex_rx_request_mode_set(nrf_802154_coex_rx_request_mode_t mode)
+{
+    bool result = nrf_802154_pib_coex_rx_request_mode_is_supported(mode);
+
+    if (result)
+    {
+        m_data.coex.rx_request_mode = mode;
+    }
+
+    return result;
+}
+
+nrf_802154_coex_rx_request_mode_t nrf_802154_pib_rx_coex_request_mode_get(void)
+{
+    return m_data.coex.rx_request_mode;
 }

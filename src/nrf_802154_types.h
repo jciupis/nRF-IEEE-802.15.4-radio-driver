@@ -162,6 +162,22 @@ typedef uint8_t nrf_802154_src_addr_match_t;
 #define NRF_802154_RSSI_INVALID INT8_MAX
 
 /**
+ * @brief Mode of triggering receive request to Coex arbiter.
+ *
+ * Possible values:
+ * - @ref NRF_802154_COEX_RX_REQUEST_MODE_DISABLED,
+ * - @ref NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION,
+ * - @ref NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE,
+ * - @ref NRF_802154_COEX_RX_REQUEST_MODE_DESTINED
+ */
+typedef uint8_t nrf_802154_coex_rx_request_mode_t;
+
+#define NRF_802154_COEX_RX_REQUEST_MODE_DISABLED         0x00 // !< Coex does not request to arbiter in receive mode.
+#define NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION 0x01 // !< Coex requests to arbiter in receive mode upon energy detected.
+#define NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE         0x02 // !< Coex requests to arbiter in receive mode upon preamble reception.
+#define NRF_802154_COEX_RX_REQUEST_MODE_DESTINED         0x03 // !< Coex requests to arbiter in receive mode upon detection that frame is addressed to this device.
+
+/**
  *@}
  **/
 

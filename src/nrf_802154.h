@@ -1235,6 +1235,29 @@ void nrf_802154_ack_timeout_set(uint32_t time);
 
 #endif // NRF_802154_ACK_TIMEOUT_ENABLED
 
+/**
+ * @}
+ * @defgroup nrf_802154_coex Wifi Coex feature
+ * @{
+ */
+
+/**
+ * @brief Sets Coex request mode used in receive operations.
+ *
+ * @param[in] mode  Coex receive request mode. For possible values see @ref nrf_802154_coex_rx_request_mode_t type.
+ *
+ * @retval true     Operation succeed.
+ * @retval false    Requested mode is not supported.
+ */
+bool nrf_802154_coex_rx_request_mode_set(nrf_802154_coex_rx_request_mode_t mode);
+
+/**
+ * @brief Gets Coex request mode used in receive operations.
+ *
+ * @return Current Coex receive request mode. For possible values see @ref nrf_802154_coex_rx_request_mode_t type.
+ */
+nrf_802154_coex_rx_request_mode_t nrf_802154_coex_rx_request_mode_get(void);
+
 /** @} */
 
 #ifdef __cplusplus
