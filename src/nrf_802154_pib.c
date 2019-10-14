@@ -49,6 +49,7 @@
 typedef struct
 {
     nrf_802154_coex_rx_request_mode_t rx_request_mode; ///< Coex request mode in receive operation.
+    nrf_802154_coex_tx_request_mode_t tx_request_mode; ///< Coex request mode in transmit operation.
 } nrf_802154_pib_coex_t;
 
 typedef struct
@@ -126,6 +127,66 @@ static nrf_radio_txpower_t to_radio_tx_power_convert(int8_t integer_tx_power)
     return radio_tx_power;
 }
 
+/**
+ * @brief Checks if provided Coex transmit request mode is supported.
+ *
+ * @param[in] mode  Coex transmit request mode to check.
+ *
+ * @retval true     When value provided by @p mode param is supported.
+ * @retval false    Otherwise.
+ */
+static bool coex_tx_request_mode_is_supported(nrf_802154_coex_tx_request_mode_t mode)
+{
+    bool result = false;
+
+    switch (mode)
+    {
+        case NRF_802154_COEX_TX_REQUEST_DISABLED:
+        case NRF_802154_COEX_TX_REQUEST_FRAME_READY:
+        case NRF_802154_COEX_TX_REQUEST_CCA_START:
+        case NRF_802154_COEX_TX_REQUEST_CCA_DONE:
+            result = true;
+            break;
+
+        default:
+            break;
+    }
+
+    return result;
+}
+
+/**
+ * @brief Checks if provided Coex receive request mode is supported.
+ *
+ * @param[in] mode  Coex receive request mode to check.
+ *
+ * @retval true     When value provided by @p mode param is supported.
+ * @retval false    Otherwise.
+ */
+static bool coex_rx_request_mode_is_supported(nrf_802154_coex_rx_request_mode_t mode)
+{
+    bool result = false;
+
+    switch (mode)
+    {
+        case NRF_802154_COEX_RX_REQUEST_MODE_DISABLED:
+#if !NRF_802154_DISABLE_BCC_MATCHING && defined(NRF_RADIO_EVENT_HELPER1)
+        case NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION:
+#endif
+        case NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE:
+#if !NRF_802154_DISABLE_BCC_MATCHING
+        case NRF_802154_COEX_RX_REQUEST_MODE_DESTINED:
+#endif
+            result = true;
+            break;
+
+        default:
+            break;
+    }
+
+    return result;
+}
+
 void nrf_802154_pib_init(void)
 {
     m_data.promiscuous = false;
@@ -148,6 +209,7 @@ void nrf_802154_pib_init(void)
 #else
     m_data.coex.rx_request_mode = NRF_802154_COEX_RX_REQUEST_MODE_DESTINED;
 #endif
+    m_data.coex.tx_request_mode = NRF_802154_COEX_TX_REQUEST_FRAME_READY;
 }
 
 bool nrf_802154_pib_promiscuous_get(void)
@@ -262,33 +324,9 @@ void nrf_802154_pib_cca_cfg_get(nrf_802154_cca_cfg_t * p_cca_cfg)
     memcpy(p_cca_cfg, &m_data.cca, sizeof(m_data.cca));
 }
 
-bool nrf_802154_pib_coex_rx_request_mode_is_supported(nrf_802154_coex_rx_request_mode_t mode)
-{
-    bool result = false;
-
-    switch (mode)
-    {
-        case NRF_802154_COEX_RX_REQUEST_MODE_DISABLED:
-#if !NRF_802154_DISABLE_BCC_MATCHING && defined(NRF_RADIO_EVENT_HELPER1)
-        case NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION:
-#endif
-        case NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE:
-#if !NRF_802154_DISABLE_BCC_MATCHING
-        case NRF_802154_COEX_RX_REQUEST_MODE_DESTINED:
-#endif
-            result = true;
-            break;
-
-        default:
-            break;
-    }
-
-    return result;
-}
-
 bool nrf_802154_pib_coex_rx_request_mode_set(nrf_802154_coex_rx_request_mode_t mode)
 {
-    bool result = nrf_802154_pib_coex_rx_request_mode_is_supported(mode);
+    bool result = coex_rx_request_mode_is_supported(mode);
 
     if (result)
     {
@@ -301,4 +339,21 @@ bool nrf_802154_pib_coex_rx_request_mode_set(nrf_802154_coex_rx_request_mode_t m
 nrf_802154_coex_rx_request_mode_t nrf_802154_pib_coex_rx_request_mode_get(void)
 {
     return m_data.coex.rx_request_mode;
+}
+
+bool nrf_802154_pib_coex_tx_request_mode_set(nrf_802154_coex_tx_request_mode_t mode)
+{
+    bool result = coex_tx_request_mode_is_supported(mode);
+
+    if (result)
+    {
+        m_data.coex.tx_request_mode = mode;
+    }
+
+    return result;
+}
+
+nrf_802154_coex_tx_request_mode_t nrf_802154_pib_tx_coex_request_mode_get(void)
+{
+    return m_data.coex.tx_request_mode;
 }
