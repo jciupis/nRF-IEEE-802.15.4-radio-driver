@@ -112,6 +112,8 @@ static bool critical_section_enter(void)
     uint32_t interrupt_state = __get_PRIMASK();
 
     __disable_irq();
+    __DSB();
+    __ISB();
 
     // Operate on local copies of the volatile variables for faster execution.
     counter = m_nested_critical_section_counter;
@@ -130,9 +132,6 @@ static bool critical_section_enter(void)
         m_nested_critical_section_counter         = counter;
         m_nested_critical_section_current_context = context;
 
-        __DSB();
-        __ISB();
-
         result = true;
     }
 
@@ -143,29 +142,62 @@ static bool critical_section_enter(void)
 
 static void critical_section_exit(void)
 {
+    bool     retry = false;
     uint8_t  counter;
     uint32_t interrupt_state = __get_PRIMASK();
 
-    __disable_irq();
-
-    // Operate on local copy of the volatile variable for faster execution.
-    counter = m_nested_critical_section_counter;
-
-    // Assert that every exit() call is paired with an enter() call
-    assert(counter > 0);
-
-    // Exit critical section only if it is not nested.
-    if (counter == 1)
+    do
     {
-        nrf_802154_critical_section_rsch_exit();
-        radio_critical_section_exit();
-        nrf_802154_lp_timer_critical_section_exit();
-    }
+        // Assert that the caller has the right to exit the critical section.
+        assert(m_nested_critical_section_current_context == current_execution_context_get());
 
-    counter--;
-    m_nested_critical_section_counter = counter;
+        // Operate on local copy of the volatile variable for faster execution.
+        counter = m_nested_critical_section_counter;
 
-    __set_PRIMASK(interrupt_state);
+        // Assert that every exit() call is paired with an enter() call
+        assert(counter > 0);
+
+        // Exit RSCH critical section with enabled interrupts (it might take some time).
+        if (counter == 1)
+        {
+            nrf_802154_critical_section_rsch_exit();
+        }
+
+        // Exit radio & LP timer critical sections atomically.
+        __disable_irq();
+        __DSB();
+        __ISB();
+
+        // TODO: Should counter be updated here?
+        // counter = m_nested_critical_section_counter;
+        // assert(counter == m_nested_critical_section_counter);
+
+        if (counter == 1)
+        {
+            radio_critical_section_exit();
+            nrf_802154_lp_timer_critical_section_exit();
+        }
+
+        counter--;
+        m_nested_critical_section_counter = counter;
+
+        __set_PRIMASK(interrupt_state);
+
+        // It might have happened that after exiting RSCH critical section, higher priority
+        // interrupt caused a change of state. Such case is handled below
+        if (nrf_802154_critical_section_rsch_event_is_pending())
+        {
+            bool result = critical_section_enter();
+            assert(result);
+            (void)result;
+
+            retry = true;
+        }
+        else
+        {
+            retry = false;
+        }
+    } while (retry);
 }
 
 /***************************************************************************************************
