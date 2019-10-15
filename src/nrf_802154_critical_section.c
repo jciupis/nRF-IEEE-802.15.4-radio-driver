@@ -146,17 +146,17 @@ static void critical_section_exit(void)
     uint8_t  counter;
     uint32_t interrupt_state = __get_PRIMASK();
 
+    // Assert that the caller has the right to exit the critical section.
+    assert(m_nested_critical_section_current_context == current_execution_context_get());
+
+    // Operate on local copy of the volatile variable for faster execution.
+    counter = m_nested_critical_section_counter;
+
+    // Assert that every exit() call is paired with an enter() call
+    assert(counter > 0);
+
     do
     {
-        // Assert that the caller has the right to exit the critical section.
-        assert(m_nested_critical_section_current_context == current_execution_context_get());
-
-        // Operate on local copy of the volatile variable for faster execution.
-        counter = m_nested_critical_section_counter;
-
-        // Assert that every exit() call is paired with an enter() call
-        assert(counter > 0);
-
         // Exit RSCH critical section with enabled interrupts (it might take some time).
         if (counter == 1)
         {
