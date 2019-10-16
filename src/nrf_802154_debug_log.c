@@ -30,7 +30,7 @@
 
 /**
  * @file
- *   This file implements debug helpers for the nRF 802.15.4 radio driver.
+ *   This file implements debug log helpers for the nRF 802.15.4 radio driver.
  *
  */
 
@@ -40,19 +40,12 @@
 
 #include "nrf.h"
 
-void nrf_802154_debug_gpio_init(void);
-void nrf_802154_debug_log_init(void);
-void nrf_802154_debug_assert_init(void);
+/// Buffer used to store debug log messages.
+volatile uint32_t nrf_802154_debug_log_buffer[NRF_802154_DEBUG_LOG_BUFFER_LEN];
+/// Index of the log buffer pointing to the element that should be filled with next log message.
+volatile uint32_t nrf_802154_debug_log_ptr = 0;
 
-void nrf_802154_debug_init(void)
+void nrf_802154_debug_log_init(void)
 {
-#if ENABLE_DEBUG_GPIO
-    nrf_802154_debug_gpio_init();
-#endif // ENABLE_DEBUG_GPIO
-#if ENABLE_DEBUG_LOG
-    nrf_802154_debug_log_init();
-#endif // ENABLE_DEBUG_LOG
-#if ENABLE_DEBUG_ASSERT
-    nrf_802154_debug_assert_init();
-#endif // ENABLE_DEBUG_ASSERT
+    // Intentionally empty
 }

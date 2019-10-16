@@ -448,6 +448,9 @@
         "_description": "This option provides an array containing events logged by the driver.",
         "_defines": [
             "ENABLE_DEBUG_LOG"
+        ],
+        "_files": [
+            "src/nrf_802154_debug_log.c"
         ]
     },
 
@@ -456,6 +459,9 @@
         "_description": "This option disables all IRQ on an assert and enters indefinite loop.",
         "_defines": [
             "ENABLE_DEBUG_ASSERT"
+        ],
+        "_files": [
+            "src/nrf_802154_debug_assert.c"
         ]
     },
 
@@ -472,6 +478,9 @@
         "_description": "This option connects RADIO events with GPIO output.",
         "_defines": [
             "ENABLE_DEBUG_GPIO"
+        ],
+        "_files": [
+            "src/nrf_802154_debug_gpio.c"
         ]
     },
 

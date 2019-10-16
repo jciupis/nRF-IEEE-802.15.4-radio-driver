@@ -30,7 +30,7 @@
 
 /**
  * @file
- *   This file implements debug helpers for the nRF 802.15.4 radio driver.
+ *   This file implements debug assert helpers for the nRF 802.15.4 radio driver.
  *
  */
 
@@ -40,19 +40,38 @@
 
 #include "nrf.h"
 
-void nrf_802154_debug_gpio_init(void);
-void nrf_802154_debug_log_init(void);
-void nrf_802154_debug_assert_init(void);
-
-void nrf_802154_debug_init(void)
+void __assert_func(const char * file, int line, const char * func, const char * cond)
 {
-#if ENABLE_DEBUG_GPIO
-    nrf_802154_debug_gpio_init();
-#endif // ENABLE_DEBUG_GPIO
-#if ENABLE_DEBUG_LOG
-    nrf_802154_debug_log_init();
-#endif // ENABLE_DEBUG_LOG
-#if ENABLE_DEBUG_ASSERT
-    nrf_802154_debug_assert_init();
-#endif // ENABLE_DEBUG_ASSERT
+    (void)file;
+    (void)line;
+    (void)func;
+    (void)cond;
+
+#if defined(ENABLE_DEBUG_ASSERT_BKPT) && (ENABLE_DEBUG_ASSERT_BKPT != 0)
+    __BKPT(0);
+#endif
+    __disable_irq();
+
+    while (1)
+        ;
+}
+
+void __aeabi_assert(const char * expr, const char * file, int line)
+{
+    (void)expr;
+    (void)file;
+    (void)line;
+
+#if defined(ENABLE_DEBUG_ASSERT_BKPT) && (ENABLE_DEBUG_ASSERT_BKPT != 0)
+    __BKPT(0);
+#endif
+    __disable_irq();
+
+    while (1)
+        ;
+}
+
+void nrf_802154_debug_assert_init(void)
+{
+    // Intentionally empty
 }
