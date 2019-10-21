@@ -47,10 +47,10 @@
 
 #include <nrf.h>
 
-#define CMSIS_IRQ_NUM_VECTACTIVE_DIFF                 16            ///< Offset in exception number of external interrupts according to ARM Archuitecture Reference Manual
+#define CMSIS_IRQ_NUM_VECTACTIVE_DIFF 16                           ///< Offset in exception number of external interrupts according to ARM Archuitecture Reference Manual
 
-static volatile uint8_t m_nested_critical_section_counter;          ///< Counter of nested critical sections
-static volatile uint8_t m_nested_critical_section_current_context;  ///< Execution context of the current critical section
+static volatile uint8_t m_nested_critical_section_counter;         ///< Counter of nested critical sections
+static volatile uint8_t m_nested_critical_section_current_context; ///< Execution context of the current critical section
 
 /***************************************************************************************************
  * @section Critical sections management
@@ -180,6 +180,7 @@ static void critical_section_exit(void)
         if (nrf_802154_critical_section_rsch_event_is_pending())
         {
             bool result = critical_section_enter();
+
             assert(result);
             (void)result;
 
@@ -193,7 +194,8 @@ static void critical_section_exit(void)
         {
             retry = false;
         }
-    } while (retry);
+    }
+    while (retry);
 }
 
 /***************************************************************************************************

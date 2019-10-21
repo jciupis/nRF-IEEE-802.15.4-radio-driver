@@ -1914,6 +1914,7 @@ void nrf_802154_radio_irq_handler(void)
 
     // Prevent interrupting of this handler by requests from higher priority code.
     bool result = nrf_802154_critical_section_enter();
+
     assert(result);
     (void)result;
 
