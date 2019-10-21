@@ -115,16 +115,13 @@ void nrf_802154_rsch_continuous_prio_changed(rsch_prio_t prio)
 
     if (crit_sect_success)
     {
+        (void)rsch_pending_evt_clear();
         nrf_802154_rsch_crit_sect_prio_changed(prio);
+        nrf_802154_critical_section_exit();
     }
     else
     {
         rsch_pending_evt_set(prio);
-    }
-
-    if (crit_sect_success)
-    {
-        nrf_802154_critical_section_exit();
     }
 }
 
