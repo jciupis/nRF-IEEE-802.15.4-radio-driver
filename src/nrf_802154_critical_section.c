@@ -92,18 +92,6 @@ static uint8_t current_execution_context_get(void)
     return (uint8_t)((SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) >> SCB_ICSR_VECTACTIVE_Pos);
 }
 
-/** @brief Check if the provided context is the same as the currently executed one.
- *
- * @param  context Context to check against the current context.
- *
- * @retval true    Active vector priority allows nested critical sections.
- * @retval false   Active vector priority denies nested critical sections.
- */
-static inline bool nested_critical_section_is_allowed_in_this_context(uint8_t context)
-{
-    return context == current_execution_context_get();
-}
-
 static bool critical_section_enter(void)
 {
     uint8_t  counter;
@@ -160,7 +148,7 @@ static void critical_section_exit(void)
     // Operate on local copy of the volatile variable for faster execution.
     counter = m_nested_critical_section_counter;
 
-    // Assert that every exit() call is paired with an enter() call
+    // Assert that every exit() call is paired with a successful enter() call
     assert(counter > 0);
 
     do
