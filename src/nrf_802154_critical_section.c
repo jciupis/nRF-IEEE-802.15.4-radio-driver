@@ -107,7 +107,6 @@ static inline bool nested_critical_section_is_allowed_in_this_context(uint8_t co
 static bool critical_section_enter(void)
 {
     uint8_t  counter;
-    uint8_t  context;
     bool     result          = false;
     uint32_t interrupt_state = __get_PRIMASK();
 
@@ -117,22 +116,31 @@ static bool critical_section_enter(void)
 
     // Operate on local copies of the volatile variables for faster execution.
     counter = m_nested_critical_section_counter;
-    context = m_nested_critical_section_current_context;
 
     // Enter critical section only if it is free or occupied by the same context.
-    if ((counter == 0) || nested_critical_section_is_allowed_in_this_context(context))
+    if (counter == 0)
     {
         counter++;
-        context = current_execution_context_get();
 
         nrf_802154_critical_section_rsch_enter();
         nrf_802154_lp_timer_critical_section_enter();
         radio_critical_section_enter();
 
         m_nested_critical_section_counter         = counter;
-        m_nested_critical_section_current_context = context;
+        m_nested_critical_section_current_context = current_execution_context_get();
 
         result = true;
+    }
+    else if (m_nested_critical_section_current_context == current_execution_context_get())
+    {
+        counter++;
+        m_nested_critical_section_counter = counter;
+
+        result = true;
+    }
+    else
+    {
+        // Intentionally empty
     }
 
     __set_PRIMASK(interrupt_state);
@@ -168,10 +176,6 @@ static void critical_section_exit(void)
         __DSB();
         __ISB();
 
-        // TODO: Should counter be updated here?
-        // counter = m_nested_critical_section_counter;
-        // assert(counter == m_nested_critical_section_counter);
-
         if (counter == 1)
         {
             radio_critical_section_exit();
@@ -190,6 +194,10 @@ static void critical_section_exit(void)
             bool result = critical_section_enter();
             assert(result);
             (void)result;
+
+            // Since critical section was entered, counter should be incremented to reflect the
+            // current value of the static counter. It's not an assignment to speed up the execution
+            counter++;
 
             retry = true;
         }
