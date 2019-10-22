@@ -1504,6 +1504,8 @@ bool nrf_802154_core_sleep(nrf_802154_term_t term_lvl)
 
             if (result)
             {
+                // Inverted order of calls in the if-else clause below is intentional
+                // and is necessary to prevent RAAL race conditions.
                 if (!timeslot_is_granted())
                 {
                     sleep_init();

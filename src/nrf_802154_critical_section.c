@@ -84,8 +84,8 @@ static void radio_critical_section_exit(void)
 
 /** @brief Get the context the code is currently executed from.
  *
- * @return If the code is executed from the main thread, the function returns UINT32_MAX.
- *         Otherwise, external interrupt number is returned.
+ * @return External interrupt number with @ref CMSIS_IRQ_NUM_VECTACTIVE_DIFF offset in case of
+ *         an interrupt context or 0 when the code is executed from the main thread.
  */
 static uint8_t current_execution_context_get(void)
 {
