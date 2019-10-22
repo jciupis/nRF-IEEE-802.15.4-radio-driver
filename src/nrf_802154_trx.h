@@ -47,6 +47,19 @@
 extern "C" {
 #endif
 
+/**@brief Notifications that can be enabled for @ref nrf_802154_trx_receive_frame operation. */
+typedef enum
+{
+    /**@brief No notifications during frame receive provided. */
+    TRX_RECEIVE_NOTIFICATION_NONE = 0U,
+
+    /**@brief Notification @ref nrf_802154_trx_receive_frame_prestarted enabled. */
+    TRX_RECEIVE_NOTIFICATION_PRESTARTED = (1U << 0),
+
+    /**@brief Notification @ref nrf_802154_trx_receive_frame_started enabled. */
+    TRX_RECEIVE_NOTIFICATION_STARTED = (1U << 1),
+} nrf_802154_trx_receive_notifications_t;
+
 /**@brief Initializes trx module.
  *
  * This function must be called exactly once, before any other API call. This function sets internal state
@@ -104,13 +117,18 @@ void nrf_802154_trx_cca_configuration_update(void);
  * The frame will be received into buffer set by @ref nrf_802154_trx_receive_buffer_set.
  *
  * When NRF_802154_DISABLE_BCC_MATCHING == 0
+ * - during receive @ref nrf_802154_trx_receive_frame_started handler is called when
+ *   SHR field of a frame being received is received (only when @p notifications_mask contained @ref TRX_RECEIVE_NOTIFICATION_STARTED flag)
  * - during receive @ref nrf_802154_trx_receive_frame_bcmatched handler is called when
  *   @p bcc octets are received.
  * - when a frame is received with correct crc, @ref nrf_802154_trx_receive_frame_received is called
  * - when a frame is received with incorrect crc, @ref nrf_802154_trx_receive_frame_crcerror is called
  *
  * When NRF_802154_DISABLE_BCC_MATCHING != 0
- * - during receive no handlers (no ISRs) are called
+ * - @ref nrf_802154_trx_receive_frame_prestarted handler is called when the RADIO initially syncs on received frame.
+ *   This handler is called when @p notifications_mask contains @ref TRX_RECEIVE_NOTIFICATION_PRESTARTED.
+ * - @ref nrf_802154_trx_receive_frame_started handler is called when
+ *   SHR field of a frame being received is received (only when @p notifications_mask contained @ref TRX_RECEIVE_NOTIFICATION_STARTED flag)
  * - after the frame is received with correct crc, @ref nrf_802154_trx_receive_frame_received is called
  * - after the frame is received with incorrect crc:
  *     - when NRF_802154_NOTIFY_CRCERROR == 0:
@@ -128,9 +146,12 @@ void nrf_802154_trx_cca_configuration_update(void);
  * @param[in] bcc   Number of received bytes after which @ref nrf_802154_trx_receive_frame_bcmatched will be called.
  *                  This must not be zero if @ref NRF_802154_DISABLE_BCC_MATCHING == 0.
  *                  When @ref NRF_802154_DISABLE_BCC_MATCHING != 0, this value must be zero.
- *
+ * @param[in] notifications_mask Selects additional notifications generated during a frame reception.
+ *                  It is bitwise combination of @ref nrf_802154_trx_receive_notifications_t values.
+ *                  When NRF_802154_DISABLE_BCC_MATCHING != 0, flag @ref TRX_RECEIVE_NOTIFICATION_PRESTARTED is forbidden.
  */
-void nrf_802154_trx_receive_frame(uint8_t bcc);
+void nrf_802154_trx_receive_frame(uint8_t                                bcc,
+                                  nrf_802154_trx_receive_notifications_t notifications_mask);
 
 /**@brief Puts the trx module into receive ACK mode.
  *
@@ -339,6 +360,47 @@ void nrf_802154_trx_abort(void);
  * the RADIO received synchronization header (SHR).
  */
 extern void nrf_802154_trx_receive_ack_started(void);
+
+/**@brief Handler called at the beginning of frame reception (earliest possible moment).
+ *
+ * This handler is called from an ISR when:
+ * - receive operation has been started with a call to @ref nrf_802154_trx_receive_frame
+ * - the RADIO peripheral detected energy on channel or started synchronizing to it.
+ *
+ * When this handler is called following holds:
+ * - trx module is in @c RXFRAME state.
+ *
+ * Implementation of @ref nrf_802154_trx_receive_frame_started may call:
+ * - @ref nrf_802154_trx_abort if current receive frame needs to be aborted
+ *   (usually followed by a call moving the trx module out of @c FINISHED state)
+ * - @ref nrf_802154_trx_disable
+ *
+ * @note This handler may be triggered several times during receive of a preamble
+ *       of a frame. It can be followed by call to @ref nrf_802154_trx_receive_frame_started
+ *       (if enabled) and then by @ref nrf_802154_trx_receive_frame_crcok or
+ *       @ref nrf_802154_trx_receive_frame_crcerror, but there is possibility
+ *       that it will not be followed by these calls (In case when the RADIO didn't found
+ *       full preamble.). If implementation of this handler starts some
+ *       activity that must be terminated by a further call, it must implement
+ *       its own timeout feature.
+ */
+extern void nrf_802154_trx_receive_frame_prestarted(void);
+
+/**@brief Handler called at the beginning of frame reception.
+ *
+ * This handler is called from an ISR when:
+ * - receive operation has been started with a call to @ref nrf_802154_trx_receive_frame
+ * - the RADIO started receiving a frame and has just received SHR field of the frame.
+ *
+ * When this handler is called following holds:
+ * - trx module is in @c RXFRAME state.
+ *
+ * Implementation of @ref nrf_802154_trx_receive_frame_started may call:
+ * - @ref nrf_802154_trx_abort if current receive frame needs to be aborted
+ *   (usually followed by a call moving the trx module out of @c FINISHED state)
+ * - @ref nrf_802154_trx_disable
+ */
+extern void nrf_802154_trx_receive_frame_started(void);
 
 /**@brief  Handler called during reception of a frame, when given number of bytes is received.
  *

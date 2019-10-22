@@ -143,7 +143,11 @@ void nrf_802154_pib_init(void)
     m_data.cca.corr_threshold = NRF_802154_CCA_CORR_THRESHOLD_DEFAULT;
     m_data.cca.corr_limit     = NRF_802154_CCA_CORR_LIMIT_DEFAULT;
 
+#if NRF_802154_DISABLE_BCC_MATCHING
+    m_data.coex.rx_request_mode = NRF_802154_COEX_RX_REQUEST_MODE_DISABLED;
+#else
     m_data.coex.rx_request_mode = NRF_802154_COEX_RX_REQUEST_MODE_DESTINED;
+#endif
 }
 
 bool nrf_802154_pib_promiscuous_get(void)
@@ -265,9 +269,13 @@ bool nrf_802154_pib_coex_rx_request_mode_is_supported(nrf_802154_coex_rx_request
     switch (mode)
     {
         case NRF_802154_COEX_RX_REQUEST_MODE_DISABLED:
+#if !NRF_802154_DISABLE_BCC_MATCHING && defined(NRF_RADIO_EVENT_HELPER1)
         case NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION:
+#endif
         case NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE:
+#if !NRF_802154_DISABLE_BCC_MATCHING
         case NRF_802154_COEX_RX_REQUEST_MODE_DESTINED:
+#endif
             result = true;
             break;
 
@@ -290,7 +298,7 @@ bool nrf_802154_pib_coex_rx_request_mode_set(nrf_802154_coex_rx_request_mode_t m
     return result;
 }
 
-nrf_802154_coex_rx_request_mode_t nrf_802154_pib_rx_coex_request_mode_get(void)
+nrf_802154_coex_rx_request_mode_t nrf_802154_pib_coex_rx_request_mode_get(void)
 {
     return m_data.coex.rx_request_mode;
 }

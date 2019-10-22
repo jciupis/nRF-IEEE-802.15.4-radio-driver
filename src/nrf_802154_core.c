@@ -118,6 +118,9 @@ static nrf_802154_flags_t m_flags;                            ///< Flags used to
 static volatile bool        m_rsch_timeslot_is_granted;       ///< State of the RSCH timeslot.
 static volatile rsch_prio_t m_rsch_priority = RSCH_PRIO_IDLE; ///< Last notified RSCH priority.
 
+/** @brief Value of argument @c notifications_mask to @ref nrf_802154_trx_receive_frame */
+static nrf_802154_trx_receive_notifications_t m_trx_receive_frame_notifications_mask;
+
 /***************************************************************************************************
  * @section Common core operations
  **************************************************************************************************/
@@ -653,6 +656,39 @@ static void falling_asleep_init(void)
     }
 }
 
+/**@brief Makes value to be passed to @ref nrf_802154_trx_receive_frame as @c notifications_mask parameter */
+static nrf_802154_trx_receive_notifications_t make_trx_frame_receive_notification_mask(void)
+{
+    nrf_802154_trx_receive_notifications_t result = TRX_RECEIVE_NOTIFICATION_NONE;
+
+    switch (nrf_802154_pib_coex_rx_request_mode_get())
+    {
+        case NRF_802154_COEX_RX_REQUEST_MODE_DISABLED:
+            /* No additional notifications required. */
+            break;
+
+        case NRF_802154_COEX_RX_REQUEST_MODE_DESTINED:
+            /* Coex requesting handled through nrf_802154_trx_receive_frame_bcmatched handler.
+             * No additional notifications required. */
+            break;
+
+        case NRF_802154_COEX_RX_REQUEST_MODE_ENERGY_DETECTION:
+            result |= TRX_RECEIVE_NOTIFICATION_PRESTARTED | TRX_RECEIVE_NOTIFICATION_STARTED;
+            // Note: TRX_RECEIVE_NOTIFICATION_STARTED is required for stopping counting timeout for
+            // activity triggered by nrf_802154_trx_receive_frame_prestarted.
+            break;
+
+        case NRF_802154_COEX_RX_REQUEST_MODE_PREAMBLE:
+            result |= TRX_RECEIVE_NOTIFICATION_STARTED;
+            break;
+
+        default:
+            assert(false);
+    }
+
+    return result;
+}
+
 /** Initialize RX operation. */
 static void rx_init(bool disabled_was_triggered)
 {
@@ -676,7 +712,7 @@ static void rx_init(bool disabled_was_triggered)
 
     nrf_802154_trx_receive_buffer_set(rx_buffer_get());
 
-    nrf_802154_trx_receive_frame(BCC_INIT / 8U);
+    nrf_802154_trx_receive_frame(BCC_INIT / 8U, m_trx_receive_frame_notifications_mask);
 
     // Configure the timer coordinator to get a timestamp of the CRCOK event.
     nrf_802154_timer_coord_timestamp_prepare(
@@ -985,6 +1021,18 @@ void nrf_802154_trx_receive_ack_started(void)
     nrf_802154_core_hooks_rx_ack_started();
 }
 
+void nrf_802154_trx_receive_frame_prestarted(void)
+{
+    assert(m_state == RADIO_STATE_RX);
+    // TODO: Implement coex requesting behavior
+}
+
+void nrf_802154_trx_receive_frame_started(void)
+{
+    assert(m_state == RADIO_STATE_RX);
+    // TODO: Implement coex requesting behavior
+}
+
 #if !NRF_802154_DISABLE_BCC_MATCHING
 uint8_t nrf_802154_trx_receive_frame_bcmatched(uint8_t bcc)
 {
@@ -1081,7 +1129,7 @@ void nrf_802154_trx_receive_frame_crcerror(void)
     // We don't change receive buffer, receive will go to the same that was already used
 #if !NRF_802154_DISABLE_BCC_MATCHING
     request_preconditions_for_state(m_state);
-    nrf_802154_trx_receive_frame(BCC_INIT / 8U);
+    nrf_802154_trx_receive_frame(BCC_INIT / 8U, m_trx_receive_frame_notifications_mask);
 #else
     // With BCC matching disabled trx module will re-arm automatically
 #endif
@@ -1542,6 +1590,8 @@ bool nrf_802154_core_receive(nrf_802154_term_t              term_lvl,
 
                 if (result)
                 {
+                    m_trx_receive_frame_notifications_mask =
+                        make_trx_frame_receive_notification_mask();
                     state_set(RADIO_STATE_RX);
                     rx_init(true);
                 }

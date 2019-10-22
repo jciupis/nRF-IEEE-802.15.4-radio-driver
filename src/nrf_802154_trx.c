@@ -37,6 +37,7 @@
 #include "nrf_802154_peripherals.h"
 #include "nrf_802154_pib.h"
 #include "nrf_802154_rssi.h"
+#include "nrf_802154_swi.h"
 #include "nrf_802154_utils.h"
 
 #include "nrf_egu.h"
@@ -50,6 +51,11 @@
 
 #define EGU_EVENT                     NRF_EGU_EVENT_TRIGGERED15
 #define EGU_TASK                      NRF_EGU_TASK_TRIGGER15
+
+#define EGU_HELPER1_EVENT             NRF_EGU_EVENT_TRIGGERED3
+#define EGU_HELPER1_TASK              NRF_EGU_TASK_TRIGGER3
+#define EGU_HELPER1_INTMASK           NRF_EGU_INT_TRIGGERED3
+
 #define PPI_CHGRP0                    NRF_802154_PPI_CORE_GROUP                     ///< PPI group used to disable self-disabling PPIs
 #define PPI_CHGRP0_DIS_TASK           NRF_PPI_TASK_CHG0_DIS                         ///< PPI task used to disable self-disabling PPIs
 
@@ -70,16 +76,22 @@
                                        (1U << PPI_ADDRESS_COUNTER_COUNT) | \
                                        (1U << PPI_CRCERROR_COUNTER_CLEAR))
 #else
-#define PPI_NO_BCC_MATCHING_USED_MASK 0U
-#endif // NRF_802154_DISABLE_BCC_MATCHING
+#define PPI_RADIO_HELPER1_EGU_HELPER1 NRF_802154_PPI_RADIO_HELPER1_TO_EGU_HELPER1 ///!< PPI that connects RADIO HELPER1 event with EGU task for HELPER1 channel
+
+#define PPI_NO_BCC_MATCHING_USED_MASK (1 << PPI_RADIO_HELPER1_EGU_HELPER1)
+#endif  // NRF_802154_DISABLE_BCC_MATCHING
 
 /**@brief Mask of all PPI channels used directly by trx module. */
-#define PPI_ALL_USED_MASK     ((1U << PPI_DISABLED_EGU) |    \
-                               (1U << PPI_EGU_RAMP_UP) |     \
-                               (1U << PPI_EGU_TIMER_START) | \
-                               (1U << PPI_CCAIDLE_FEM) |     \
-                               (1U << PPI_TIMER_TX_ACK) |    \
-                               PPI_NO_BCC_MATCHING_USED_MASK)
+#define PPI_ALL_USED_MASK ((1U << PPI_DISABLED_EGU) |    \
+                           (1U << PPI_EGU_RAMP_UP) |     \
+                           (1U << PPI_EGU_TIMER_START) | \
+                           (1U << PPI_CCAIDLE_FEM) |     \
+                           (1U << PPI_TIMER_TX_ACK) |    \
+                           PPI_NO_BCC_MATCHING_USED_MASK)
+
+#if ((PPI_ALL_USED_MASK & NRF_802154_PPI_CHANNELS_USED_MASK) != PPI_ALL_USED_MASK)
+#error Some channels in PPI_ALL_USED_MASK not found in NRF_802154_PPI_CHANNELS_USED_MASK
+#endif
 
 #if NRF_802154_DISABLE_BCC_MATCHING
 #define SHORT_ADDRESS_BCSTART 0UL
@@ -505,6 +517,9 @@ void nrf_802154_trx_init(void)
     m_trx_state = TRX_STATE_DISABLED;
 
     nrf_timer_init();
+#if defined(NRF_RADIO_EVENT_HELPER1)
+    nrf_802154_swi_init();
+#endif
 }
 
 void nrf_802154_trx_enable(void)
@@ -582,6 +597,10 @@ void nrf_802154_trx_disable(void)
 
 #if !NRF_802154_DISABLE_BCC_MATCHING
         nrf_ppi_fork_endpoint_setup(PPI_EGU_RAMP_UP, 0);
+
+#if defined(NRF_RADIO_EVENT_HELPER1)
+        nrf_egu_int_disable(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_INTMASK);
+#endif
 #else
         nrf_ppi_fork_endpoint_setup(PPI_EGU_TIMER_START, 0);
 #endif // NRF_802154_DISABLE_BCC_MATCHING
@@ -715,7 +734,8 @@ bool nrf_802154_trx_receive_buffer_set(void * p_receive_buffer)
     return result;
 }
 
-void nrf_802154_trx_receive_frame(uint8_t bcc)
+void nrf_802154_trx_receive_frame(uint8_t                                bcc,
+                                  nrf_802154_trx_receive_notifications_t notifications_mask)
 {
     uint32_t ints_to_enable = 0U;
     uint32_t shorts         = SHORTS_RX;
@@ -766,6 +786,34 @@ void nrf_802154_trx_receive_frame(uint8_t bcc)
 #endif // !NRF_802154_DISABLE_BCC_MATCHING
     nrf_radio_event_clear(NRF_RADIO_EVENT_CRCOK);
     ints_to_enable |= NRF_RADIO_INT_CRCOK_MASK;
+
+    if ((notifications_mask & TRX_RECEIVE_NOTIFICATION_STARTED) != 0U)
+    {
+        nrf_radio_event_clear(NRF_RADIO_EVENT_ADDRESS);
+        ints_to_enable |= NRF_RADIO_INT_ADDRESS_MASK;
+    }
+
+    if ((notifications_mask & TRX_RECEIVE_NOTIFICATION_PRESTARTED) != 0U)
+    {
+#if NRF_802154_DISABLE_BCC_MATCHING || !defined(NRF_RADIO_EVENT_HELPER1)
+        assert(false);
+#else
+        // The RADIO can't generate interrupt on EVENTS_HELPER1. Path to generate interrupt:
+        // RADIO.EVENTS_HELPER1 -> PPI_RADIO_HELPER1_EGU_HELPER1 -> EGU.TASK_HELPER1 -> EGU.EVENT_HELPER1 ->
+        // SWI_IRQHandler (in nrf_802154_swi.c), calls nrf_802154_trx_swi_irq_handler
+        nrf_ppi_channel_endpoint_setup(PPI_RADIO_HELPER1_EGU_HELPER1,
+                                       (uint32_t)nrf_radio_event_address_get(
+                                           NRF_RADIO_EVENT_HELPER1),
+                                       (uint32_t)nrf_egu_task_address_get(
+                                           NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_TASK));
+        nrf_ppi_channel_enable(PPI_RADIO_HELPER1_EGU_HELPER1);
+
+        nrf_radio_event_clear(NRF_RADIO_EVENT_HELPER1);
+        nrf_egu_event_clear(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_EVENT);
+        nrf_egu_int_enable(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_INTMASK);
+#endif
+    }
+
     nrf_radio_int_enable(ints_to_enable);
 
     // Set FEM
@@ -1159,6 +1207,10 @@ static void rxframe_finish_disable_ppis(void)
     nrf_ppi_fork_endpoint_setup(PPI_EGU_RAMP_UP, 0);
 #endif // NRF_802154_DISABLE_BCC_MATCHING
 
+#if !NRF_802154_DISABLE_BCC_MATCHING && defined(NRF_RADIO_EVENT_HELPER1)
+    nrf_ppi_channel_disable(PPI_RADIO_HELPER1_EGU_HELPER1);
+#endif
+
     nrf_ppi_channel_disable(PPI_EGU_TIMER_START);
 #if NRF_802154_DISABLE_BCC_MATCHING
     nrf_ppi_fork_endpoint_setup(PPI_EGU_TIMER_START, 0);
@@ -1185,7 +1237,7 @@ static void rxframe_finish_disable_fem_activation(void)
 
 static void rxframe_finish_disable_ints(void)
 {
-    uint32_t ints_to_disable = NRF_RADIO_INT_CRCOK_MASK;
+    uint32_t ints_to_disable = NRF_RADIO_INT_CRCOK_MASK | NRF_RADIO_INT_ADDRESS_MASK;
 
 #if !NRF_802154_DISABLE_BCC_MATCHING || NRF_802154_NOTIFY_CRCERROR
     ints_to_disable |= NRF_RADIO_INT_CRCERROR_MASK;
@@ -1194,6 +1246,10 @@ static void rxframe_finish_disable_ints(void)
     ints_to_disable |= NRF_RADIO_INT_BCMATCH_MASK;
 #endif // !NRF_802154_DISABLE_BCC_MATCHING
     nrf_radio_int_disable(ints_to_disable);
+
+#if !NRF_802154_DISABLE_BCC_MATCHING && defined(NRF_RADIO_EVENT_HELPER1)
+    nrf_egu_int_disable(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_INTMASK);
+#endif
 }
 
 static void rxframe_finish_psdu_is_not_being_received(void)
@@ -1573,6 +1629,10 @@ static void irq_handler_address(void)
 {
     switch (m_trx_state)
     {
+        case TRX_STATE_RXFRAME:
+            nrf_802154_trx_receive_frame_started();
+            break;
+
         case TRX_STATE_RXACK:
             m_flags.rssi_started = true;
             nrf_802154_trx_receive_ack_started();
@@ -1908,6 +1968,16 @@ static void irq_handler_edend(void)
     nrf_802154_trx_energy_detection_finished(ed_sample);
 }
 
+#if defined(NRF_RADIO_EVENT_HELPER1)
+static void irq_handler_helper1(void)
+{
+    assert(m_trx_state == TRX_STATE_RXFRAME);
+
+    nrf_802154_trx_receive_frame_prestarted();
+}
+
+#endif
+
 void nrf_802154_radio_irq_handler(void)
 {
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_IRQ_HANDLER);
@@ -1917,6 +1987,20 @@ void nrf_802154_radio_irq_handler(void)
 
     assert(result);
     (void)result;
+
+#if defined(NRF_RADIO_EVENT_HELPER1)
+    // Note: For NRF_RADIO_EVENT_HELPER1 we enable interrupt through EGU.
+    // That's why we check here EGU's EGU_HELPER1_INTMASK.
+    // The RADIO does not have interrupt from HELPER1 event.
+    if (nrf_egu_int_enable_check(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_INTMASK) &&
+        nrf_radio_event_check(NRF_RADIO_EVENT_HELPER1))
+    {
+        nrf_radio_event_clear(NRF_RADIO_EVENT_HELPER1);
+        nrf_egu_event_clear(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_EVENT);
+
+        irq_handler_helper1();
+    }
+#endif
 
     if (nrf_radio_int_enable_check(NRF_RADIO_INT_ADDRESS_MASK) &&
         nrf_radio_event_check(NRF_RADIO_EVENT_ADDRESS))
@@ -2035,3 +2119,27 @@ void RADIO_IRQHandler(void)
 }
 
 #endif // NRF_802154_INTERNAL_RADIO_IRQ_HANDLING
+
+#if defined(NRF_RADIO_EVENT_HELPER1)
+void nrf_802154_trx_swi_irq_handler(void)
+{
+    if (nrf_egu_int_enable_check(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_INTMASK) &&
+        nrf_egu_event_check(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_EVENT))
+    {
+        nrf_egu_event_clear(NRF_802154_SWI_EGU_INSTANCE, EGU_HELPER1_EVENT);
+
+        // We are in SWI_IRQHandler, which priority is usually lower than RADIO_IRQHandler.
+        // To avoid problems with critical sections, trigger RADIO_IRQ manually.
+        // - If we are not in critical section, RADIO_IRQ will start shortly (calling
+        // nrf_802154_radio_irq_handler) preempting current SWI_IRQHandler. From
+        // nrf_802154_radio_irq_handler we acquire critical section and
+        // process helper1 event.
+        // If we are in critical section, the RADIO_IRQ is disabled on NVIC.
+        // Following will make it pending, and processing of RADIO_IRQ will start
+        // when critical section is left.
+
+        NVIC_SetPendingIRQ(RADIO_IRQn);
+    }
+}
+
+#endif

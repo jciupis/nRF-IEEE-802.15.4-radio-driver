@@ -35,21 +35,71 @@
  *
  */
 
+#include <assert.h>
+
+#include "nrf_802154_config.h"
+#include "nrf_802154_peripherals.h"
 #include "nrf_802154_priority_drop.h"
 
 #include "nrf_802154_swi.h"
+#include "nrf_egu.h"
+#include "platform/clock/nrf_802154_clock.h"
+
+#define SWI_EGU          NRF_802154_SWI_EGU_INSTANCE ///< Label of SWI peripheral.
+
+#define HFCLK_STOP_INT   NRF_EGU_INT_TRIGGERED1      ///< Label of HFClk stop interrupt.
+#define HFCLK_STOP_TASK  NRF_EGU_TASK_TRIGGER1       ///< Label of HFClk stop task.
+#define HFCLK_STOP_EVENT NRF_EGU_EVENT_TRIGGERED1    ///< Label of HFClk stop event.
+
+/**
+ * @brief Requests a stop of the HF clock.
+ *
+ * The notification is triggered from the SWI priority level.
+ *
+ * @note This function is to be called through notification module to prevent calling it from
+ *       the arbiter context.
+ */
+static void swi_hfclk_stop(void)
+{
+    assert(!nrf_egu_event_check(SWI_EGU, HFCLK_STOP_EVENT));
+
+    nrf_egu_task_trigger(SWI_EGU, HFCLK_STOP_TASK);
+}
+
+/**
+ * @brief Terminates the stopping of the HF clock.
+ *
+ * @note This function terminates the stopping of the HF clock only if it has not been performed
+ * yet.
+ */
+static void swi_hfclk_stop_terminate(void)
+{
+    nrf_egu_event_clear(SWI_EGU, HFCLK_STOP_EVENT);
+}
 
 void nrf_802154_priority_drop_init(void)
 {
+    nrf_egu_int_enable(SWI_EGU, HFCLK_STOP_INT);
+
     nrf_802154_swi_init();
 }
 
 void nrf_802154_priority_drop_hfclk_stop(void)
 {
-    nrf_802154_swi_hfclk_stop();
+    swi_hfclk_stop();
 }
 
 void nrf_802154_priority_drop_hfclk_stop_terminate(void)
 {
-    nrf_802154_swi_hfclk_stop_terminate();
+    swi_hfclk_stop_terminate();
+}
+
+void nrf_802154_priority_drop_swi_irq_handler(void)
+{
+    if (nrf_egu_event_check(SWI_EGU, HFCLK_STOP_EVENT))
+    {
+        nrf_802154_clock_hfclk_stop();
+
+        nrf_egu_event_clear(SWI_EGU, HFCLK_STOP_EVENT);
+    }
 }
