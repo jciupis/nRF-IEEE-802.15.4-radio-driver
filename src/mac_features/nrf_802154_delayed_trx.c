@@ -201,7 +201,23 @@ static bool dly_op_request(uint32_t         t0,
                            uint32_t         length,
                            rsch_dly_ts_id_t dly_ts_id)
 {
-    bool result;
+    bool        result;
+    rsch_prio_t prio;
+
+    switch (dly_ts_id)
+    {
+        case RSCH_DLY_TX:
+            prio = RSCH_PRIO_TX;
+            break;
+
+        case RSCH_DLY_RX:
+            prio = RSCH_PRIO_RX;
+            break;
+
+        default:
+            assert(false);
+            break;
+    }
 
     // Set PENDING state before timeslot request, in case timeslot starts
     // immediatly and interrupts current function execution.
@@ -210,8 +226,9 @@ static bool dly_op_request(uint32_t         t0,
     result = nrf_802154_rsch_delayed_timeslot_request(t0,
                                                       dt,
                                                       length,
-                                                      RSCH_PRIO_MAX,
-                                                      dly_ts_id);
+                                                      prio,
+                                                      dly_ts_id,
+                                                      RSCH_PREC_REQ_MINIMAL);
 
     if (!result)
     {
@@ -473,9 +490,8 @@ void nrf_802154_rsch_delayed_timeslot_started(rsch_dly_ts_id_t dly_ts_id)
 
 bool nrf_802154_delayed_trx_transmit_cancel(void)
 {
-    bool result;
+    bool result = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_TX, RSCH_PREC_REQ_MINIMAL);
 
-    result                      = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_TX);
     m_dly_op_state[RSCH_DLY_TX] = DELAYED_TRX_OP_STATE_STOPPED;
 
     return result;
@@ -483,10 +499,7 @@ bool nrf_802154_delayed_trx_transmit_cancel(void)
 
 bool nrf_802154_delayed_trx_receive_cancel(void)
 {
-    bool result;
-
-    result = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_RX);
-
+    bool result = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_RX, RSCH_PREC_REQ_MINIMAL);
     bool was_running;
 
     nrf_802154_timer_sched_remove(&m_timeout_timer, &was_running);

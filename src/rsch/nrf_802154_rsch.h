@@ -90,9 +90,19 @@ typedef enum
 {
     RSCH_DLY_TX,     ///< Timeslot for delayed TX operation.
     RSCH_DLY_RX,     ///< Timeslot for delayed RX operation.
+    RSCH_DLY_CSMACA, ///< Timeslot for CSMA/CA operation.
 
     RSCH_DLY_TS_NUM, ///< Number of delayed timeslots.
 } rsch_dly_ts_id_t;
+
+/**
+ * @brief Enumeration of the precondition requesting strategies.
+ */
+typedef enum
+{
+    RSCH_PREC_REQ_CONSTANT, ///< Preconditions requested immediately and released only by @ref nrf_802154_rsch_delayed_timeslot_cancel call.
+    RSCH_PREC_REQ_MINIMAL,  ///< Preconditions requested as late as possible and released as soon as possible.
+} rsch_dly_ts_prec_req_t;
 
 /**
  * @brief Initializes Radio Scheduler.
@@ -162,30 +172,34 @@ bool nrf_802154_rsch_timeslot_request(uint32_t length_us);
  *
  * @note The time parameters use the same units that are used in the Timer Scheduler module.
  *
- * @param[in]  t0      Base time of the timestamp of the timeslot start, in microseconds.
- * @param[in]  dt      Time delta between @p t0 and the timestamp of the timeslot start, in microseconds.
- * @param[in]  length  Requested radio timeslot length, in microseconds.
- * @param[in]  prio    Priority level required for the delayed timeslot.
- * @param[in]  dly_ts  Type of the requested timeslot.
+ * @param[in]  t0               Base time of the timestamp of the timeslot start, in microseconds.
+ * @param[in]  dt               Time delta between @p t0 and the timestamp of the timeslot start, in microseconds.
+ * @param[in]  length           Requested radio timeslot length, in microseconds.
+ * @param[in]  prio             Priority level required for the delayed timeslot.
+ * @param[in]  dly_ts_id        Type of the requested timeslot.
+ * @param[in]  dly_ts_prec_req  Precondition request strategy.
  *
  * @retval true   Requested timeslot has been scheduled.
  * @retval false  Requested timeslot cannot be scheduled and will not be granted.
  */
-bool nrf_802154_rsch_delayed_timeslot_request(uint32_t         t0,
-                                              uint32_t         dt,
-                                              uint32_t         length,
-                                              rsch_prio_t      prio,
-                                              rsch_dly_ts_id_t dly_ts);
+bool nrf_802154_rsch_delayed_timeslot_request(uint32_t               t0,
+                                              uint32_t               dt,
+                                              uint32_t               length,
+                                              rsch_prio_t            prio,
+                                              rsch_dly_ts_id_t       dly_ts_id,
+                                              rsch_dly_ts_prec_req_t dly_ts_prec_req);
 
 /**
  * @brief Cancels a requested future timeslot.
  *
- * @param[in] dly_ts_id     Type of the requested timeslot.
+ * @param[in] dly_ts_id        Type of the requested timeslot.
+ * @param[in] dly_ts_prec_req  Precondition request strategy of the requested timeslot.
  *
  * @retval true     Scheduled timeslot has been cancelled.
  * @retval false    No scheduled timeslot has been requested (nothing to cancel).
  */
-bool nrf_802154_rsch_delayed_timeslot_cancel(rsch_dly_ts_id_t dly_ts_id);
+bool nrf_802154_rsch_delayed_timeslot_cancel(rsch_dly_ts_id_t       dly_ts_id,
+                                             rsch_dly_ts_prec_req_t dly_ts_prec_req);
 
 /**
  * @brief Checks if there is a pending timeslot request.
