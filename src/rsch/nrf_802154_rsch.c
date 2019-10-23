@@ -338,10 +338,13 @@ static void delayed_timeslot_start(void * p_context)
 
     nrf_802154_rsch_delayed_timeslot_started(dly_ts_id);
 
-    p_dly_ts->prio = RSCH_PRIO_IDLE;
-
-    all_prec_update();
-    notify_core();
+    // Drop preconditions immediately if minimal request strategy has been selected
+    if (p_dly_ts->prec_req == RSCH_PREC_REQ_MINIMAL)
+    {
+        p_dly_ts->prio = RSCH_PRIO_IDLE;
+        all_prec_update();
+        notify_core();
+    }
 
     nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_RSCH_TIMER_DELAYED_START);
 }
