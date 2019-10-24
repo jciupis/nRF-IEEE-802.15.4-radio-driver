@@ -201,17 +201,25 @@ static bool dly_op_request(uint32_t         t0,
                            uint32_t         length,
                            rsch_dly_ts_id_t dly_ts_id)
 {
-    bool        result;
-    rsch_prio_t prio;
+    bool                result;
+    rsch_dly_ts_param_t dly_ts_param =
+    {
+        .t0                = t0,
+        .dt                = dt,
+        .length            = length,
+        .prio              = RSCH_PRIO_IDLE,
+        .id                = dly_ts_id,
+        .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
+    };
 
     switch (dly_ts_id)
     {
         case RSCH_DLY_TX:
-            prio = RSCH_PRIO_TX;
+            dly_ts_param.prio = RSCH_PRIO_TX;
             break;
 
         case RSCH_DLY_RX:
-            prio = RSCH_PRIO_RX;
+            dly_ts_param.prio = RSCH_PRIO_IDLE_LISTENING;
             break;
 
         default:
@@ -223,12 +231,7 @@ static bool dly_op_request(uint32_t         t0,
     // immediatly and interrupts current function execution.
     dly_op_state_set(dly_ts_id, DELAYED_TRX_OP_STATE_STOPPED, DELAYED_TRX_OP_STATE_PENDING);
 
-    result = nrf_802154_rsch_delayed_timeslot_request(t0,
-                                                      dt,
-                                                      length,
-                                                      prio,
-                                                      dly_ts_id,
-                                                      RSCH_PREC_REQ_MINIMAL);
+    result = nrf_802154_rsch_delayed_timeslot_request(&dly_ts_param);
 
     if (!result)
     {
@@ -490,7 +493,7 @@ void nrf_802154_rsch_delayed_timeslot_started(rsch_dly_ts_id_t dly_ts_id)
 
 bool nrf_802154_delayed_trx_transmit_cancel(void)
 {
-    bool result = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_TX, RSCH_PREC_REQ_MINIMAL);
+    bool result = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_TX);
 
     m_dly_op_state[RSCH_DLY_TX] = DELAYED_TRX_OP_STATE_STOPPED;
 
@@ -499,7 +502,7 @@ bool nrf_802154_delayed_trx_transmit_cancel(void)
 
 bool nrf_802154_delayed_trx_receive_cancel(void)
 {
-    bool result = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_RX, RSCH_PREC_REQ_MINIMAL);
+    bool result = nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_RX);
     bool was_running;
 
     nrf_802154_timer_sched_remove(&m_timeout_timer, &was_running);
