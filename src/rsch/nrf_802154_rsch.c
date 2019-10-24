@@ -436,10 +436,8 @@ bool nrf_802154_rsch_timeslot_request(uint32_t length_us)
     return nrf_raal_timeslot_request(length_us);
 }
 
-bool nrf_802154_rsch_delayed_timeslot_request(rsch_dly_ts_param_t * p_dly_ts_param)
+bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_ts_param)
 {
-    (void)p_dly_ts_param->length;
-
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_RSCH_DELAYED_TIMESLOT_REQ);
     assert(p_dly_ts_param->id < RSCH_DLY_TS_NUM);
 

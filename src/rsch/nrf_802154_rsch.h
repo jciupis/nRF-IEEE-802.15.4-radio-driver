@@ -190,7 +190,7 @@ bool nrf_802154_rsch_timeslot_request(uint32_t length_us);
  * @retval true   Requested timeslot has been scheduled.
  * @retval false  Requested timeslot cannot be scheduled and will not be granted.
  */
-bool nrf_802154_rsch_delayed_timeslot_request(rsch_dly_ts_param_t * p_dly_ts_param);
+bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_ts_param);
 
 /**
  * @brief Cancels a requested future timeslot.
