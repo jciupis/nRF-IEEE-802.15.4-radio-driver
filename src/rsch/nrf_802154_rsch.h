@@ -105,6 +105,11 @@ typedef enum
 } rsch_dly_ts_prec_req_strategy_t;
 
 /**
+ * @brief Function pointer used for notifying about delayed timeslot start.
+ */
+typedef void (* rsch_dly_ts_started_callback_t)(rsch_dly_ts_id_t dly_ts_id);
+
+/**
  * @brief Structure that holds parameters of a delayed timeslot request.
  */
 typedef struct
@@ -115,6 +120,7 @@ typedef struct
     rsch_prio_t                     prio;              ///< Priority level required for the delayed timeslot.
     rsch_dly_ts_id_t                id;                ///< Type of the requested timeslot.
     rsch_dly_ts_prec_req_strategy_t prec_req_strategy; ///< Precondition request strategy.
+    rsch_dly_ts_started_callback_t  started_callback;  ///< Callback called when delayed timeslot starts.
 } rsch_dly_ts_param_t;
 
 /**
@@ -178,9 +184,9 @@ bool nrf_802154_rsch_timeslot_request(uint32_t length_us);
  *
  * Request timeslot that is to be granted in the future. The function parameters provide data when
  * the timeslot is supposed to start and how long it is to last. When the requested timeslot starts,
- * @ref nrf_802154_rsch_delayed_timeslot_started is called.
+ * @p p_dly_ts_param->started_callback is called.
  *
- * @note @ref nrf_802154_rsch_delayed_timeslot_started can be delayed and it is up to
+ * @note @p p_dly_ts_param->started_callback can be delayed and it is up to
  *       the called module to check the delay and decide if it causes any issues.
  *
  * @note The time parameters use the same units that are used in the Timer Scheduler module.
@@ -242,13 +248,6 @@ uint32_t nrf_802154_rsch_timeslot_us_left_get(void);
  * @param[in]  prio  Currently approved priority level.
  */
 extern void nrf_802154_rsch_continuous_prio_changed(rsch_prio_t prio);
-
-/**
- * @brief Notifies that the previously requested delayed timeslot has started just now.
- *
- * @param[in]  dly_ts_id  Type of the started timeslot.
- */
-extern void nrf_802154_rsch_delayed_timeslot_started(rsch_dly_ts_id_t dly_ts_id);
 
 /**
  *@}

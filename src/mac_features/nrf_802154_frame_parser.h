@@ -42,7 +42,7 @@
 #define NRF_802154_FRAME_PARSER_INVALID_OFFSET 0xff
 
 /**
- * @biref Structure that contains pointers to parts of MHR and details of MHR structure.
+ * @brief Structure that contains pointers to parts of MHR and details of MHR structure.
  */
 typedef struct
 {

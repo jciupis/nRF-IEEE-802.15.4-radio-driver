@@ -359,6 +359,38 @@ static void rx_timeslot_started_callout(void)
     }
 }
 
+/**
+ * Notifies that the previously requested delayed timeslot has started just now.
+ *
+ * @param[in]  dly_ts_id  Type of the started timeslot.
+ */
+static void timeslot_started_callout(rsch_dly_ts_id_t dly_ts_id)
+{
+    delayed_trx_op_state_t dly_op_state = dly_op_state_get(dly_ts_id);
+
+    if (dly_op_state == DELAYED_TRX_OP_STATE_PENDING)
+    {
+        switch (dly_ts_id)
+        {
+            case RSCH_DLY_TX:
+                tx_timeslot_started_callout();
+                break;
+
+            case RSCH_DLY_RX:
+                rx_timeslot_started_callout();
+                break;
+
+            default:
+                assert(false);
+                break;
+        }
+    }
+    else if (dly_op_state != DELAYED_TRX_OP_STATE_STOPPED)
+    {
+        assert(false);
+    }
+}
+
 bool nrf_802154_delayed_trx_transmit(const uint8_t * p_data,
                                      bool            cca,
                                      uint32_t        t0,
@@ -396,6 +428,7 @@ bool nrf_802154_delayed_trx_transmit(const uint8_t * p_data,
             .prio              = RSCH_PRIO_TX,
             .id                = RSCH_DLY_TX,
             .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
+            .started_callback  = timeslot_started_callout,
         };
 
         result = dly_op_request(&dly_ts_param);
@@ -438,47 +471,13 @@ bool nrf_802154_delayed_trx_receive(uint32_t t0,
             .prio              = RSCH_PRIO_IDLE_LISTENING,
             .id                = RSCH_DLY_RX,
             .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
+            .started_callback  = timeslot_started_callout,
         };
 
         result = dly_op_request(&dly_ts_param);
     }
 
     return result;
-}
-
-static inline void timeslot_started_callout(rsch_dly_ts_id_t dly_ts_id)
-{
-    switch (dly_ts_id)
-    {
-        case RSCH_DLY_TX:
-            tx_timeslot_started_callout();
-            break;
-
-        case RSCH_DLY_RX:
-            rx_timeslot_started_callout();
-            break;
-
-        default:
-            assert(false);
-            break;
-    }
-}
-
-void nrf_802154_rsch_delayed_timeslot_started(rsch_dly_ts_id_t dly_ts_id)
-{
-    switch (dly_op_state_get(dly_ts_id))
-    {
-        case DELAYED_TRX_OP_STATE_PENDING:
-            timeslot_started_callout(dly_ts_id);
-            break;
-
-        case DELAYED_TRX_OP_STATE_STOPPED:
-            /* Intentionally do nothing */
-            break;
-
-        default:
-            assert(false);
-    }
 }
 
 bool nrf_802154_delayed_trx_transmit_cancel(void)

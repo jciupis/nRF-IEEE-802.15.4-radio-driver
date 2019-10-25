@@ -58,11 +58,8 @@ static rsch_prio_t          m_cont_mode_prio;                ///< Continuous mod
 
 typedef struct
 {
-    uint32_t                        t0;                ///< Time base of the delayed timeslot trigger time.
-    uint32_t                        dt;                ///< Time delta of the delayed timeslot trigger time.
-    rsch_prio_t                     prio;              ///< Delayed timeslot priority level. If delayed timeslot is not scheduled equal to @ref RSCH_PRIO_IDLE.
-    nrf_802154_timer_t              timer;             ///< Timer used to trigger delayed timeslot.
-    rsch_dly_ts_prec_req_strategy_t prec_req_strategy; ///< Delayed timeslot precondition requesting strategy.
+    nrf_802154_timer_t  timer; ///< Timer used to trigger delayed timeslot.
+    rsch_dly_ts_param_t param; ///< Parameters of the delayed timeslot.
 } dly_ts_t;
 
 static dly_ts_t m_dly_ts[RSCH_DLY_TS_NUM];
@@ -135,12 +132,12 @@ static rsch_prio_t max_prio_for_delayed_timeslot_get(void)
     for (uint32_t i = 0; i < RSCH_DLY_TS_NUM; i++)
     {
         dly_ts_t  * p_dly_ts    = &m_dly_ts[i];
-        rsch_prio_t dly_ts_prio = p_dly_ts->prio;
-        uint32_t    t0          = p_dly_ts->t0;
-        uint32_t    dt          = p_dly_ts->dt - PREC_RAMP_UP_TIME -
+        rsch_prio_t dly_ts_prio = p_dly_ts->param.prio;
+        uint32_t    t0          = p_dly_ts->param.t0;
+        uint32_t    dt          = p_dly_ts->param.dt - PREC_RAMP_UP_TIME -
                                   nrf_802154_timer_sched_granularity_get();
 
-        if ((p_dly_ts->prec_req_strategy == RSCH_PREC_REQ_STRATEGY_SHORTEST) &&
+        if ((p_dly_ts->param.prec_req_strategy == RSCH_PREC_REQ_STRATEGY_SHORTEST) &&
             nrf_802154_timer_sched_time_is_in_future(now, t0, dt))
         {
             dly_ts_prio = RSCH_PRIO_IDLE;
@@ -337,12 +334,12 @@ static void delayed_timeslot_start(void * p_context)
 
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_RSCH_TIMER_DELAYED_START);
 
-    nrf_802154_rsch_delayed_timeslot_started(dly_ts_id);
+    p_dly_ts->param.started_callback(dly_ts_id);
 
     // Drop preconditions immediately if minimal request strategy has been selected
-    if (p_dly_ts->prec_req_strategy == RSCH_PREC_REQ_STRATEGY_SHORTEST)
+    if (p_dly_ts->param.prec_req_strategy == RSCH_PREC_REQ_STRATEGY_SHORTEST)
     {
-        p_dly_ts->prio = RSCH_PRIO_IDLE;
+        p_dly_ts->param.prio = RSCH_PRIO_IDLE;
         all_prec_update();
         notify_core();
     }
@@ -363,8 +360,8 @@ static void delayed_timeslot_prec_request(void * p_context)
 
     all_prec_update();
 
-    p_dly_ts->timer.t0        = p_dly_ts->t0;
-    p_dly_ts->timer.dt        = p_dly_ts->dt;
+    p_dly_ts->timer.t0        = p_dly_ts->param.t0;
+    p_dly_ts->timer.dt        = p_dly_ts->param.dt;
     p_dly_ts->timer.callback  = delayed_timeslot_start;
     p_dly_ts->timer.p_context = p_context;
 
@@ -389,7 +386,7 @@ void nrf_802154_rsch_init(void)
 
     for (uint32_t i = 0; i < RSCH_DLY_TS_NUM; i++)
     {
-        m_dly_ts[i].prio = RSCH_PRIO_IDLE;
+        m_dly_ts[i].param.prio = RSCH_PRIO_IDLE;
     }
 
     for (uint32_t i = 0; i < RSCH_PREC_CNT; i++)
@@ -447,16 +444,22 @@ bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_
     bool       result   = true;
 
     assert(!nrf_802154_timer_sched_is_running(&p_dly_ts->timer));
-    assert(p_dly_ts->prio == RSCH_PRIO_IDLE);
     assert(p_dly_ts_param->prio != RSCH_PRIO_IDLE);
+
+    // Allow to overwrite a delayed timeslot with manual precondition request strategy
+    if (p_dly_ts->param.prec_req_strategy == RSCH_PREC_REQ_STRATEGY_SHORTEST)
+    {
+        assert(p_dly_ts->param.prio == RSCH_PRIO_IDLE);
+    }
 
     // There is enough time for preconditions ramp-up no matter their current state.
     if (nrf_802154_timer_sched_time_is_in_future(now, p_dly_ts_param->t0, req_dt))
     {
-        p_dly_ts->prio              = p_dly_ts_param->prio;
-        p_dly_ts->t0                = p_dly_ts_param->t0;
-        p_dly_ts->dt                = p_dly_ts_param->dt;
-        p_dly_ts->prec_req_strategy = p_dly_ts_param->prec_req_strategy;
+        p_dly_ts->param.prio              = p_dly_ts_param->prio;
+        p_dly_ts->param.t0                = p_dly_ts_param->t0;
+        p_dly_ts->param.dt                = p_dly_ts_param->dt;
+        p_dly_ts->param.prec_req_strategy = p_dly_ts_param->prec_req_strategy;
+        p_dly_ts->param.started_callback  = p_dly_ts_param->started_callback;
 
         p_dly_ts->timer.t0        = p_dly_ts_param->t0;
         p_dly_ts->timer.p_context = (void *)p_dly_ts_param->id;
@@ -486,10 +489,11 @@ bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_
     else if (requested_prio_lvl_is_at_least(RSCH_PRIO_IDLE_LISTENING) &&
              nrf_802154_timer_sched_time_is_in_future(now, p_dly_ts_param->t0, p_dly_ts_param->dt))
     {
-        p_dly_ts->prio              = p_dly_ts_param->prio;
-        p_dly_ts->t0                = p_dly_ts_param->t0;
-        p_dly_ts->dt                = p_dly_ts_param->dt;
-        p_dly_ts->prec_req_strategy = p_dly_ts_param->prec_req_strategy;
+        p_dly_ts->param.prio              = p_dly_ts_param->prio;
+        p_dly_ts->param.t0                = p_dly_ts_param->t0;
+        p_dly_ts->param.dt                = p_dly_ts_param->dt;
+        p_dly_ts->param.prec_req_strategy = p_dly_ts_param->prec_req_strategy;
+        p_dly_ts->param.started_callback  = p_dly_ts_param->started_callback;
 
         p_dly_ts->timer.t0        = p_dly_ts_param->t0;
         p_dly_ts->timer.dt        = p_dly_ts_param->dt;
@@ -522,11 +526,11 @@ bool nrf_802154_rsch_delayed_timeslot_cancel(rsch_dly_ts_id_t dly_ts_id)
 
     nrf_802154_timer_sched_remove(&p_dly_ts->timer, &was_running);
 
-    p_dly_ts->prio = RSCH_PRIO_IDLE;
+    p_dly_ts->param.prio = RSCH_PRIO_IDLE;
     all_prec_update();
     notify_core();
 
-    switch (p_dly_ts->prec_req_strategy)
+    switch (p_dly_ts->param.prec_req_strategy)
     {
         case RSCH_PREC_REQ_STRATEGY_SHORTEST:
             result = was_running;

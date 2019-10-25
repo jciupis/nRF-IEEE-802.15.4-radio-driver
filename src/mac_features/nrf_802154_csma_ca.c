@@ -43,20 +43,24 @@
 
 #include "nrf_802154_config.h"
 #include "nrf_802154_const.h"
-#include "../nrf_802154_debug.h"
+#include "nrf_802154_debug.h"
 #include "nrf_802154_notification.h"
+#include "nrf_802154_pib.h"
+#include "nrf_802154_procedures_duration.h"
 #include "nrf_802154_request.h"
+#include "mac_features/nrf_802154_frame_parser.h"
 #include "platform/random/nrf_802154_random.h"
+#include "rsch/nrf_802154_rsch.h"
 #include "timer_scheduler/nrf_802154_timer_sched.h"
 
 #if NRF_802154_CSMA_CA_ENABLED
 
-static uint8_t m_nb;                    ///< The number of times the CSMA-CA algorithm was required to back off while attempting the current transmission.
-static uint8_t m_be;                    ///< Backoff exponent, which is related to how many backoff periods a device shall wait before attempting to assess a channel.
+static uint8_t m_nb;                     ///< The number of times the CSMA-CA algorithm was required to back off while attempting the current transmission.
+static uint8_t m_be;                     ///< Backoff exponent, which is related to how many backoff periods a device shall wait before attempting to assess a channel.
 
-static const uint8_t    * mp_data;      ///< Pointer to a buffer containing PHR and PSDU of the frame being transmitted.
-static nrf_802154_timer_t m_timer;      ///< Timer used to back off during CSMA-CA procedure.
-static bool               m_is_running; ///< Indicates if CSMA-CA procedure is running.
+static const uint8_t * mp_data;          ///< Pointer to a buffer containing PHR and PSDU of the frame being transmitted.
+static bool            m_is_running;     ///< Indicates if CSMA-CA procedure is running.
+static uint32_t        m_frame_duration; ///< Duration of the frame being transmitted in microseconds.
 
 /**
  * @brief Perform appropriate actions for busy channel conditions.
@@ -86,6 +90,7 @@ static bool procedure_is_running(void)
  */
 static void procedure_stop(void)
 {
+    nrf_802154_rsch_delayed_timeslot_cancel(RSCH_DLY_CSMACA);
     m_is_running = false;
 }
 
@@ -111,9 +116,9 @@ static void notify_busy_channel(bool result)
  *
  * @param[in] p_context  Unused variable passed from the Timer Scheduler module.
  */
-static void frame_transmit(void * p_context)
+static void frame_transmit(rsch_dly_ts_id_t dly_ts_id)
 {
-    (void)p_context;
+    (void)dly_ts_id;
 
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CSMA_FRAME_TRANSMIT);
 
@@ -140,12 +145,33 @@ static void random_backoff_start(void)
 {
     uint8_t backoff_periods = nrf_802154_random_get() % (1 << m_be);
 
-    m_timer.callback  = frame_transmit;
-    m_timer.p_context = NULL;
-    m_timer.t0        = nrf_802154_timer_sched_time_get();
-    m_timer.dt        = backoff_periods * UNIT_BACKOFF_PERIOD;
+    if (0 == backoff_periods)
+    {
+        // Don't schedule a delayed operation, because its target time would be in the past anyway.
+        // Attempt to transmit straight away instead
+        frame_transmit(RSCH_DLY_CSMACA);
+    }
+    else
+    {
+        rsch_dly_ts_param_t backoff_ts_param =
+        {
+            .t0                = nrf_802154_timer_sched_time_get(),
+            .dt                = backoff_periods * UNIT_BACKOFF_PERIOD,
+            .length            = m_frame_duration,
+            .prio              = RSCH_PRIO_TX,
+            .id                = RSCH_DLY_CSMACA,
+            .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
+            .started_callback  = &frame_transmit,
+        };
 
-    nrf_802154_timer_sched_add(&m_timer, false);
+        // If Coex precondition should be requested immediately, change precondition request strategy
+        if (nrf_802154_pib_coex_tx_request_mode_get() == NRF_802154_COEX_TX_REQUEST_FRAME_READY)
+        {
+            backoff_ts_param.prec_req_strategy = RSCH_PREC_REQ_STRATEGY_MANUAL;
+        }
+
+        nrf_802154_rsch_delayed_timeslot_request(&backoff_ts_param);
+    }
 }
 
 static bool channel_busy(void)
@@ -183,38 +209,38 @@ void nrf_802154_csma_ca_start(const uint8_t * p_data)
 {
     assert(!procedure_is_running());
 
-    mp_data      = p_data;
-    m_nb         = 0;
-    m_be         = NRF_802154_CSMA_CA_MIN_BE;
-    m_is_running = true;
+    mp_data          = p_data;
+    m_nb             = 0;
+    m_be             = NRF_802154_CSMA_CA_MIN_BE;
+    m_is_running     = true;
+    m_frame_duration = nrf_802154_tx_duration_get(p_data[0],
+                                                  true,
+                                                  nrf_802154_frame_parser_ar_bit_is_set(p_data));
 
     random_backoff_start();
 }
 
 bool nrf_802154_csma_ca_abort(nrf_802154_term_t term_lvl, req_originator_t req_orig)
 {
-    bool result = false;
-
     // Stop CSMA-CA only if request by the core or the higher layer.
     if ((req_orig != REQ_ORIG_CORE) && (req_orig != REQ_ORIG_HIGHER_LAYER))
     {
         return true;
     }
 
+    bool result = true;
+
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CSMA_ABORT);
 
     if (term_lvl >= NRF_802154_TERM_802154)
     {
         // Stop CSMA-CA if termination level is high enough.
-        nrf_802154_timer_sched_remove(&m_timer, NULL);
         procedure_stop();
-
-        result = true;
     }
-    else if (!procedure_is_running())
+    else
     {
         // Return success in case procedure is already stopped.
-        result = true;
+        result = !procedure_is_running();
     }
 
     nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CSMA_ABORT);
@@ -246,7 +272,6 @@ bool nrf_802154_csma_ca_tx_started_hook(const uint8_t * p_frame)
     {
         nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CSMA_TX_STARTED);
 
-        assert(!nrf_802154_timer_sched_is_running(&m_timer));
         procedure_stop();
 
         nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CSMA_TX_STARTED);
