@@ -266,7 +266,7 @@ static void notify_rx_timeout(void * p_context)
  *
  * @param[in]  result  Result of TX request.
  */
-static void tx_timeslot_started_callback(bool result)
+static void dly_tx_result_notify(bool result)
 {
     (void)result;
 
@@ -286,7 +286,7 @@ static void tx_timeslot_started_callback(bool result)
  *
  * @param[in]  result  Result of RX request.
  */
-static void rx_timeslot_started_callback(bool result)
+static void dly_rx_result_notify(bool result)
 {
     if (result)
     {
@@ -314,7 +314,7 @@ static void rx_timeslot_started_callback(bool result)
 /**
  * Handle TX timeslot start.
  */
-static void tx_timeslot_started_callout(void)
+static void tx_timeslot_started_callback(void)
 {
     bool result;
 
@@ -328,18 +328,18 @@ static void tx_timeslot_started_callout(void)
                                           mp_tx_data,
                                           m_tx_cca,
                                           true,
-                                          tx_timeslot_started_callback);
+                                          dly_tx_result_notify);
     }
     else
     {
-        tx_timeslot_started_callback(result);
+        dly_tx_result_notify(result);
     }
 }
 
 /**
  * Handle RX timeslot start.
  */
-static void rx_timeslot_started_callout(void)
+static void rx_timeslot_started_callback(void)
 {
     bool result;
 
@@ -350,12 +350,12 @@ static void rx_timeslot_started_callout(void)
     {
         (void)nrf_802154_request_receive(NRF_802154_TERM_802154,
                                          REQ_ORIG_DELAYED_TRX,
-                                         rx_timeslot_started_callback,
+                                         dly_rx_result_notify,
                                          true);
     }
     else
     {
-        rx_timeslot_started_callback(result);
+        dly_rx_result_notify(result);
     }
 }
 
@@ -364,7 +364,7 @@ static void rx_timeslot_started_callout(void)
  *
  * @param[in]  dly_ts_id  Type of the started timeslot.
  */
-static void timeslot_started_callout(rsch_dly_ts_id_t dly_ts_id)
+static void timeslot_started_callback(rsch_dly_ts_id_t dly_ts_id)
 {
     delayed_trx_op_state_t dly_op_state = dly_op_state_get(dly_ts_id);
 
@@ -373,11 +373,11 @@ static void timeslot_started_callout(rsch_dly_ts_id_t dly_ts_id)
         switch (dly_ts_id)
         {
             case RSCH_DLY_TX:
-                tx_timeslot_started_callout();
+                tx_timeslot_started_callback();
                 break;
 
             case RSCH_DLY_RX:
-                rx_timeslot_started_callout();
+                rx_timeslot_started_callback();
                 break;
 
             default:
@@ -428,7 +428,7 @@ bool nrf_802154_delayed_trx_transmit(const uint8_t * p_data,
             .prio              = RSCH_PRIO_TX,
             .id                = RSCH_DLY_TX,
             .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
-            .started_callback  = timeslot_started_callout,
+            .started_callback  = timeslot_started_callback,
         };
 
         result = dly_op_request(&dly_ts_param);
@@ -471,7 +471,7 @@ bool nrf_802154_delayed_trx_receive(uint32_t t0,
             .prio              = RSCH_PRIO_IDLE_LISTENING,
             .id                = RSCH_DLY_RX,
             .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
-            .started_callback  = timeslot_started_callout,
+            .started_callback  = timeslot_started_callback,
         };
 
         result = dly_op_request(&dly_ts_param);
