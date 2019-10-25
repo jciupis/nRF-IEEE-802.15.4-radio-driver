@@ -158,16 +158,16 @@ static void random_backoff_start(void)
             .t0                = nrf_802154_timer_sched_time_get(),
             .dt                = backoff_periods * UNIT_BACKOFF_PERIOD,
             .length            = m_frame_duration,
-            .prio              = RSCH_PRIO_TX,
+            .prio              = RSCH_PRIO_IDLE_LISTENING,
             .id                = RSCH_DLY_CSMACA,
-            .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
+            .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_MANUAL,
             .started_callback  = &frame_transmit,
         };
 
-        // If Coex precondition should be requested immediately, change precondition request strategy
+        // If Coex precondition should be requested immediately, preconditions priority must be leveraged
         if (nrf_802154_pib_coex_tx_request_mode_get() == NRF_802154_COEX_TX_REQUEST_FRAME_READY)
         {
-            backoff_ts_param.prec_req_strategy = RSCH_PREC_REQ_STRATEGY_MANUAL;
+            backoff_ts_param.prio = RSCH_PRIO_TX;
         }
 
         // If backoff was not scheduled successfully, handle it like a failed attempt
