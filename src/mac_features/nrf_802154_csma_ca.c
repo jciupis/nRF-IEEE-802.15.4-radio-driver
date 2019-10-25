@@ -95,7 +95,7 @@ static void procedure_stop(void)
 }
 
 /**
- * Notify MAC layer that channel is busy if tx request failed and there are no retries left.
+ * @brief Notify MAC layer that channel is busy if tx request failed and there are no retries left.
  *
  * @param[in]  result  Result of TX request.
  */
@@ -140,10 +140,18 @@ static void frame_transmit(rsch_dly_ts_id_t dly_ts_id)
 
 /**
  * @brief Delay CCA procedure for random (2^BE - 1) unit backoff periods.
+ *
+ * @param[in] allow_zero_backoff  Flag that indicates if backoff equal to 0 can be allowed for.
  */
-static void random_backoff_start(void)
+static void random_backoff_start(bool allow_zero_backoff)
 {
-    uint8_t backoff_periods = nrf_802154_random_get() % (1 << m_be);
+    uint8_t backoff_periods;
+
+    do
+    {
+        backoff_periods = nrf_802154_random_get() % (1 << m_be);
+    }
+    while (!allow_zero_backoff && (0 == backoff_periods));
 
     if (0 == backoff_periods)
     {
@@ -178,6 +186,32 @@ static void random_backoff_start(void)
     }
 }
 
+/**
+ * @brief Reschedule a transmission attempt with random backoff time.
+ *
+ * param[in] allow_zero_backoff  Flag that indicates if backoff equal to 0 can be allowed for.
+ */
+static bool reschedule(bool allow_zero_backoff)
+{
+    m_nb++;
+
+    if (m_be < NRF_802154_CSMA_CA_MAX_BE)
+    {
+        m_be++;
+    }
+
+    if (m_nb < NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS)
+    {
+        random_backoff_start(allow_zero_backoff);
+        return false;
+    }
+    else
+    {
+        procedure_stop();
+        return true;
+    }
+}
+
 static bool channel_busy(void)
 {
     bool result = true;
@@ -186,24 +220,25 @@ static bool channel_busy(void)
     {
         nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CSMA_CHANNEL_BUSY);
 
-        m_nb++;
-
-        if (m_be < NRF_802154_CSMA_CA_MAX_BE)
-        {
-            m_be++;
-        }
-
-        if (m_nb < NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS)
-        {
-            random_backoff_start();
-            result = false;
-        }
-        else
-        {
-            procedure_stop();
-        }
+        result = reschedule(true);
 
         nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CSMA_CHANNEL_BUSY);
+    }
+
+    return result;
+}
+
+/**
+ * @brief Perform appropriate actions when a transmission attempt fails because it's aborted
+ *        by another operation.
+ */
+static bool backoff_aborted(void)
+{
+    bool result = true;
+
+    if (procedure_is_running())
+    {
+        result = reschedule(false);
     }
 
     return result;
@@ -221,7 +256,7 @@ void nrf_802154_csma_ca_start(const uint8_t * p_data)
                                                   true,
                                                   nrf_802154_frame_parser_ar_bit_is_set(p_data));
 
-    random_backoff_start();
+    random_backoff_start(true);
 }
 
 bool nrf_802154_csma_ca_abort(nrf_802154_term_t term_lvl, req_originator_t req_orig)
@@ -262,7 +297,14 @@ bool nrf_802154_csma_ca_tx_failed_hook(const uint8_t * p_frame, nrf_802154_tx_er
     {
         nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CSMA_TX_FAILED);
 
-        result = channel_busy();
+        if (error == NRF_802154_TX_ERROR_ABORTED)
+        {
+            result = backoff_aborted();
+        }
+        else
+        {
+            result = channel_busy();
+        }
 
         nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CSMA_TX_FAILED);
     }
