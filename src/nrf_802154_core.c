@@ -1586,7 +1586,7 @@ void nrf_802154_trx_standalone_cca_finished(bool channel_was_idle)
 
 void nrf_802154_trx_transmit_frame_ccaidle(void)
 {
-    assert(m_state == RADIO_STATE_TX);
+    assert(m_state == RADIO_STATE_CCA_TX);
     assert(m_trx_transmit_frame_notifications_mask & TRX_TRANSMIT_NOTIFICATION_CCAIDLE);
     assert(m_coex_tx_request_mode == NRF_802154_COEX_TX_REQUEST_CCA_DONE);
 
