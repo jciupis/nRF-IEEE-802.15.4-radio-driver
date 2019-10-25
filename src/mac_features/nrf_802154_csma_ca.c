@@ -170,7 +170,11 @@ static void random_backoff_start(void)
             backoff_ts_param.prec_req_strategy = RSCH_PREC_REQ_STRATEGY_MANUAL;
         }
 
-        nrf_802154_rsch_delayed_timeslot_request(&backoff_ts_param);
+        // If backoff was not scheduled successfully, handle it like a failed attempt
+        if (!nrf_802154_rsch_delayed_timeslot_request(&backoff_ts_param))
+        {
+            channel_busy();
+        }
     }
 }
 
