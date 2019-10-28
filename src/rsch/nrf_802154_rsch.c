@@ -443,13 +443,13 @@ bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_
     uint32_t   req_dt   = p_dly_ts_param->dt - PREC_RAMP_UP_TIME;
     bool       result   = true;
 
-    assert(!nrf_802154_timer_sched_is_running(&p_dly_ts->timer));
     assert(p_dly_ts_param->prio != RSCH_PRIO_IDLE);
 
     // Allow to overwrite a delayed timeslot with manual precondition request strategy
     if (p_dly_ts->param.prec_req_strategy == RSCH_PREC_REQ_STRATEGY_SHORTEST)
     {
         assert(p_dly_ts->param.prio == RSCH_PRIO_IDLE);
+        assert(!nrf_802154_timer_sched_is_running(&p_dly_ts->timer));
     }
 
     // There is enough time for preconditions ramp-up no matter their current state.
