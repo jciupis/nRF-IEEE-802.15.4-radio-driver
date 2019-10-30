@@ -140,75 +140,31 @@ static void frame_transmit(rsch_dly_ts_id_t dly_ts_id)
 
 /**
  * @brief Delay CCA procedure for random (2^BE - 1) unit backoff periods.
- *
- * @param[in] allow_zero_backoff  Flag that indicates if backoff equal to 0 can be allowed for.
  */
-static void random_backoff_start(bool allow_zero_backoff)
+static void random_backoff_start(void)
 {
-    uint8_t backoff_periods;
+    uint8_t backoff_periods = nrf_802154_random_get() % (1 << m_be);
 
-    do
+    rsch_dly_ts_param_t backoff_ts_param =
     {
-        backoff_periods = nrf_802154_random_get() % (1 << m_be);
-    }
-    while (!allow_zero_backoff && (0 == backoff_periods));
+        .t0                = nrf_802154_timer_sched_time_get(),
+        .dt                = backoff_periods * UNIT_BACKOFF_PERIOD,
+        .prio              = RSCH_PRIO_IDLE_LISTENING,
+        .id                = RSCH_DLY_CSMACA,
+        .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_MANUAL,
+        .started_callback  = frame_transmit,
+    };
 
-    if (0 == backoff_periods)
+    // If Coex precondition should be requested immediately, preconditions priority must be leveraged
+    if (nrf_802154_pib_coex_tx_request_mode_get() == NRF_802154_COEX_TX_REQUEST_MODE_FRAME_READY)
     {
-        // Don't schedule a delayed operation, because its target time would be in the past anyway.
-        // Attempt to transmit straight away instead
-        frame_transmit(RSCH_DLY_CSMACA);
-    }
-    else
-    {
-        rsch_dly_ts_param_t backoff_ts_param =
-        {
-            .t0                = nrf_802154_timer_sched_time_get(),
-            .dt                = backoff_periods * UNIT_BACKOFF_PERIOD,
-            .length            = m_frame_duration,
-            .prio              = RSCH_PRIO_IDLE_LISTENING,
-            .id                = RSCH_DLY_CSMACA,
-            .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_MANUAL,
-            .started_callback  = &frame_transmit,
-        };
-
-        // If Coex precondition should be requested immediately, preconditions priority must be leveraged
-        if (nrf_802154_pib_coex_tx_request_mode_get() == NRF_802154_COEX_TX_REQUEST_MODE_FRAME_READY)
-        {
-            backoff_ts_param.prio = RSCH_PRIO_TX;
-        }
-
-        // If backoff was not scheduled successfully, handle it like a failed attempt
-        if (!nrf_802154_rsch_delayed_timeslot_request(&backoff_ts_param))
-        {
-            channel_busy();
-        }
-    }
-}
-
-/**
- * @brief Reschedule a transmission attempt with random backoff time.
- *
- * param[in] allow_zero_backoff  Flag that indicates if backoff equal to 0 can be allowed for.
- */
-static bool reschedule(bool allow_zero_backoff)
-{
-    m_nb++;
-
-    if (m_be < NRF_802154_CSMA_CA_MAX_BE)
-    {
-        m_be++;
+        backoff_ts_param.prio = RSCH_PRIO_TX;
     }
 
-    if (m_nb < NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS)
+    // Delayed timeslot with these parameters should always be scheduled
+    if (!nrf_802154_rsch_delayed_timeslot_request(&backoff_ts_param))
     {
-        random_backoff_start(allow_zero_backoff);
-        return false;
-    }
-    else
-    {
-        procedure_stop();
-        return true;
+        assert(false);
     }
 }
 
@@ -220,25 +176,24 @@ static bool channel_busy(void)
     {
         nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CSMA_CHANNEL_BUSY);
 
-        result = reschedule(true);
+        m_nb++;
+
+        if (m_be < NRF_802154_CSMA_CA_MAX_BE)
+        {
+            m_be++;
+        }
+
+        if (m_nb < NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS)
+        {
+            random_backoff_start();
+            result = false;
+        }
+        else
+        {
+            procedure_stop();
+        }
 
         nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CSMA_CHANNEL_BUSY);
-    }
-
-    return result;
-}
-
-/**
- * @brief Perform appropriate actions when a transmission attempt fails because it's aborted
- *        by another operation.
- */
-static bool backoff_aborted(void)
-{
-    bool result = true;
-
-    if (procedure_is_running())
-    {
-        result = reschedule(false);
     }
 
     return result;
@@ -256,7 +211,7 @@ void nrf_802154_csma_ca_start(const uint8_t * p_data)
                                                   true,
                                                   nrf_802154_frame_parser_ar_bit_is_set(p_data));
 
-    random_backoff_start(true);
+    random_backoff_start();
 }
 
 bool nrf_802154_csma_ca_abort(nrf_802154_term_t term_lvl, req_originator_t req_orig)
@@ -297,14 +252,7 @@ bool nrf_802154_csma_ca_tx_failed_hook(const uint8_t * p_frame, nrf_802154_tx_er
     {
         nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CSMA_TX_FAILED);
 
-        if (error == NRF_802154_TX_ERROR_ABORTED)
-        {
-            result = backoff_aborted();
-        }
-        else
-        {
-            result = channel_busy();
-        }
+        result = channel_busy();
 
         nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CSMA_TX_FAILED);
     }

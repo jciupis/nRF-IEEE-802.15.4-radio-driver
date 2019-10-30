@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <string.h>
 #include <nrf.h>
 
 #include "../nrf_802154_debug.h"
@@ -436,14 +437,14 @@ bool nrf_802154_rsch_timeslot_request(uint32_t length_us)
 bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_ts_param)
 {
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_RSCH_DELAYED_TIMESLOT_REQ);
+
     assert(p_dly_ts_param->id < RSCH_DLY_TS_NUM);
+    assert(p_dly_ts_param->prio != RSCH_PRIO_IDLE);
 
     dly_ts_t * p_dly_ts = &m_dly_ts[p_dly_ts_param->id];
     uint32_t   now      = nrf_802154_timer_sched_time_get();
     uint32_t   req_dt   = p_dly_ts_param->dt - PREC_RAMP_UP_TIME;
     bool       result   = true;
-
-    assert(p_dly_ts_param->prio != RSCH_PRIO_IDLE);
 
     // Allow to overwrite a delayed timeslot with manual precondition request strategy
     if (p_dly_ts->param.prec_req_strategy == RSCH_PREC_REQ_STRATEGY_SHORTEST)
@@ -452,62 +453,71 @@ bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_
         assert(!nrf_802154_timer_sched_is_running(&p_dly_ts->timer));
     }
 
-    // There is enough time for preconditions ramp-up no matter their current state.
-    if (nrf_802154_timer_sched_time_is_in_future(now, p_dly_ts_param->t0, req_dt))
+    switch (p_dly_ts_param->prec_req_strategy)
     {
-        p_dly_ts->param.prio              = p_dly_ts_param->prio;
-        p_dly_ts->param.t0                = p_dly_ts_param->t0;
-        p_dly_ts->param.dt                = p_dly_ts_param->dt;
-        p_dly_ts->param.prec_req_strategy = p_dly_ts_param->prec_req_strategy;
-        p_dly_ts->param.started_callback  = p_dly_ts_param->started_callback;
-
-        p_dly_ts->timer.t0        = p_dly_ts_param->t0;
-        p_dly_ts->timer.p_context = (void *)p_dly_ts_param->id;
-
-        switch (p_dly_ts_param->prec_req_strategy)
+        case RSCH_PREC_REQ_STRATEGY_SHORTEST:
         {
-            case RSCH_PREC_REQ_STRATEGY_SHORTEST:
-                p_dly_ts->timer.dt       = req_dt;
-                p_dly_ts->timer.callback = delayed_timeslot_prec_request;
-                nrf_802154_timer_sched_add(&p_dly_ts->timer, false);
-                break;
+            // There is enough time for preconditions ramp-up no matter their current state.
+            if (nrf_802154_timer_sched_time_is_in_future(now, p_dly_ts_param->t0, req_dt))
+            {
+                p_dly_ts->param = *p_dly_ts_param;
 
-            case RSCH_PREC_REQ_STRATEGY_MANUAL:
-                p_dly_ts->timer.dt       = p_dly_ts_param->dt;
-                p_dly_ts->timer.callback = delayed_timeslot_start;
+                p_dly_ts->timer.t0        = p_dly_ts_param->t0;
+                p_dly_ts->timer.dt        = req_dt;
+                p_dly_ts->timer.callback  = delayed_timeslot_prec_request;
+                p_dly_ts->timer.p_context = (void *)p_dly_ts_param->id;
+
+                nrf_802154_timer_sched_add(&p_dly_ts->timer, false);
+            }
+            // There is not enough time to perform full precondition ramp-up.
+            // Try with the currently approved preconditions
+            else if (requested_prio_lvl_is_at_least(RSCH_PRIO_IDLE_LISTENING) &&
+                     nrf_802154_timer_sched_time_is_in_future(now,
+                                                              p_dly_ts_param->t0,
+                                                              p_dly_ts_param->dt))
+            {
+                p_dly_ts->param = *p_dly_ts_param;
+
+                p_dly_ts->timer.t0        = p_dly_ts_param->t0;
+                p_dly_ts->timer.dt        = p_dly_ts_param->dt;
+                p_dly_ts->timer.callback  = delayed_timeslot_start;
+                p_dly_ts->timer.p_context = (void *)p_dly_ts_param->id;
+
                 all_prec_update();
-                nrf_802154_timer_sched_add(&p_dly_ts->timer, false);
-                break;
 
-            default:
+                nrf_802154_timer_sched_add(&p_dly_ts->timer, true);
+            }
+            // The requested time is in the past.
+            else
+            {
                 result = false;
-                assert(false);
-                break;
+            }
+
+            break;
         }
-    }
-    // There is not enough time to perform full precondition ramp-up. Try with the currently approved preconditions
-    else if (requested_prio_lvl_is_at_least(RSCH_PRIO_IDLE_LISTENING) &&
-             nrf_802154_timer_sched_time_is_in_future(now, p_dly_ts_param->t0, p_dly_ts_param->dt))
-    {
-        p_dly_ts->param.prio              = p_dly_ts_param->prio;
-        p_dly_ts->param.t0                = p_dly_ts_param->t0;
-        p_dly_ts->param.dt                = p_dly_ts_param->dt;
-        p_dly_ts->param.prec_req_strategy = p_dly_ts_param->prec_req_strategy;
-        p_dly_ts->param.started_callback  = p_dly_ts_param->started_callback;
 
-        p_dly_ts->timer.t0        = p_dly_ts_param->t0;
-        p_dly_ts->timer.dt        = p_dly_ts_param->dt;
-        p_dly_ts->timer.callback  = delayed_timeslot_start;
-        p_dly_ts->timer.p_context = (void *)p_dly_ts_param->id;
+        case RSCH_PREC_REQ_STRATEGY_MANUAL:
+        {
+            p_dly_ts->param = *p_dly_ts_param;
 
-        all_prec_update();
+            p_dly_ts->timer.t0        = p_dly_ts_param->t0;
+            p_dly_ts->timer.dt        = p_dly_ts_param->dt;
+            p_dly_ts->timer.callback  = delayed_timeslot_start;
+            p_dly_ts->timer.p_context = (void *)p_dly_ts_param->id;
 
-        nrf_802154_timer_sched_add(&p_dly_ts->timer, true);
-    }
-    // The requested time is in the past.
-    else
-    {
-        result = false;
+            all_prec_update();
+
+            nrf_802154_timer_sched_add(&p_dly_ts->timer, false);
+
+            break;
+        }
+
+        default:
+        {
+            result = false;
+            assert(false);
+            break;
+        }
     }
 
     nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_RSCH_DELAYED_TIMESLOT_REQ);
