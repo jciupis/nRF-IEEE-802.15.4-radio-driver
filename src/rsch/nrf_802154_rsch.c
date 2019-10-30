@@ -48,11 +48,8 @@
                                                 PREC_RAMP_UP_MARGIN)
 #endif
 
-static volatile uint8_t     m_ntf_mutex;                     ///< Mutex for notyfying core.
-static volatile uint8_t     m_ntf_mutex_monitor;             ///< Mutex monitor, incremented every failed ntf mutex lock.
 static volatile uint8_t     m_req_mutex;                     ///< Mutex for requesting preconditions.
 static volatile uint8_t     m_req_mutex_monitor;             ///< Mutex monitor, incremented every failed req mutex lock.
-static volatile rsch_prio_t m_last_notified_prio;            ///< Last reported approved priority level.
 static volatile rsch_prio_t m_approved_prios[RSCH_PREC_CNT]; ///< Priority levels approved by each precondition.
 static rsch_prio_t          m_requested_prio;                ///< Priority requested from all preconditions.
 static rsch_prio_t          m_cont_mode_prio;                ///< Continuous mode priority level. If continuous mode is not requested equal to @ref RSCH_PRIO_IDLE.
@@ -292,34 +289,7 @@ static inline void notify_core(void)
 {
     nrf_802154_log_entry(notify_core, 2);
 
-    rsch_prio_t approved_prio_lvl;
-    uint8_t     temp_mon;
-
-    do
-    {
-        if (!mutex_trylock(&m_ntf_mutex, &m_ntf_mutex_monitor))
-        {
-            return;
-        }
-
-        /* It is possible that preemption is not detected (m_ntf_mutex_monitor is read after
-         * acquiring mutex). It is not a problem because we will call proper handler function
-         * requested by preempting context. Avoiding this race would generate one additional
-         * iteration without any effect.
-         */
-        temp_mon          = m_ntf_mutex_monitor;
-        approved_prio_lvl = approved_prio_lvl_get();
-
-        if (m_last_notified_prio != approved_prio_lvl)
-        {
-            m_last_notified_prio = approved_prio_lvl;
-
-            nrf_802154_rsch_continuous_prio_changed(approved_prio_lvl);
-        }
-
-        mutex_unlock(&m_ntf_mutex);
-    }
-    while (temp_mon != m_ntf_mutex_monitor);
+    nrf_802154_rsch_continuous_prio_changed(approved_prio_lvl_get());
 
     nrf_802154_log_exit(notify_core, 2);
 }
@@ -379,9 +349,7 @@ void nrf_802154_rsch_init(void)
 {
     nrf_raal_init();
 
-    m_ntf_mutex          = 0;
     m_req_mutex          = 0;
-    m_last_notified_prio = RSCH_PRIO_IDLE;
     m_cont_mode_prio     = RSCH_PRIO_IDLE;
     m_requested_prio     = RSCH_PRIO_IDLE;
 
