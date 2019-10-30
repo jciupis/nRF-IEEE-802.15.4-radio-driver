@@ -116,7 +116,6 @@ typedef struct
 {
     uint32_t                        t0;                ///< Base time of the timestamp of the timeslot start, in microseconds.
     uint32_t                        dt;                ///< Time delta between @p t0 and the timestamp of the timeslot start, in microseconds.
-    uint32_t                        length;            ///< Requested radio timeslot length, in microseconds.
     rsch_prio_t                     prio;              ///< Priority level required for the delayed timeslot.
     rsch_dly_ts_id_t                id;                ///< Type of the requested timeslot.
     rsch_dly_ts_prec_req_strategy_t prec_req_strategy; ///< Precondition request strategy.

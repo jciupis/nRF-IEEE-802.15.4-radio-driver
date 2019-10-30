@@ -312,82 +312,82 @@ static void dly_rx_result_notify(bool result)
 }
 
 /**
- * Handle TX timeslot start.
- */
-static void tx_timeslot_started_callback(void)
-{
-    bool result;
-
-    nrf_802154_pib_channel_set(m_tx_channel);
-    result = nrf_802154_request_channel_update();
-
-    if (result)
-    {
-        (void)nrf_802154_request_transmit(NRF_802154_TERM_802154,
-                                          REQ_ORIG_DELAYED_TRX,
-                                          mp_tx_data,
-                                          m_tx_cca,
-                                          true,
-                                          dly_tx_result_notify);
-    }
-    else
-    {
-        dly_tx_result_notify(result);
-    }
-}
-
-/**
- * Handle RX timeslot start.
- */
-static void rx_timeslot_started_callback(void)
-{
-    bool result;
-
-    nrf_802154_pib_channel_set(m_rx_channel);
-    result = nrf_802154_request_channel_update();
-
-    if (result)
-    {
-        (void)nrf_802154_request_receive(NRF_802154_TERM_802154,
-                                         REQ_ORIG_DELAYED_TRX,
-                                         dly_rx_result_notify,
-                                         true);
-    }
-    else
-    {
-        dly_rx_result_notify(result);
-    }
-}
-
-/**
- * Notifies that the previously requested delayed timeslot has started just now.
+ * Notify that the previously requested delayed TX timeslot has started just now.
  *
  * @param[in]  dly_ts_id  Type of the started timeslot.
  */
-static void timeslot_started_callback(rsch_dly_ts_id_t dly_ts_id)
+static void tx_timeslot_started_callback(rsch_dly_ts_id_t dly_ts_id)
 {
-    delayed_trx_op_state_t dly_op_state = dly_op_state_get(dly_ts_id);
+    assert(dly_ts_id == RSCH_DLY_TX);
 
-    if (dly_op_state == DELAYED_TRX_OP_STATE_PENDING)
+    switch (dly_op_state_get(dly_ts_id))
     {
-        switch (dly_ts_id)
+        case DELAYED_TRX_OP_STATE_PENDING:
         {
-            case RSCH_DLY_TX:
-                tx_timeslot_started_callback();
-                break;
+            nrf_802154_pib_channel_set(m_tx_channel);
 
-            case RSCH_DLY_RX:
-                rx_timeslot_started_callback();
-                break;
+            if (nrf_802154_request_channel_update())
+            {
+                (void)nrf_802154_request_transmit(NRF_802154_TERM_802154,
+                                                  REQ_ORIG_DELAYED_TRX,
+                                                  mp_tx_data,
+                                                  m_tx_cca,
+                                                  true,
+                                                  dly_tx_result_notify);
+            }
+            else
+            {
+                dly_tx_result_notify(false);
+            }
 
-            default:
-                assert(false);
-                break;
+            break;
         }
+
+        case DELAYED_TRX_OP_STATE_STOPPED:
+            break;
+
+        default:
+            assert(false);
+            break;
     }
-    else if (dly_op_state != DELAYED_TRX_OP_STATE_STOPPED)
+}
+
+/**
+ * Notify that the previously requested delayed RX timeslot has started just now.
+ *
+ * @param[in]  dly_ts_id  Type of the started timeslot.
+ */
+static void rx_timeslot_started_callback(rsch_dly_ts_id_t dly_ts_id)
+{
+    assert(dly_ts_id == RSCH_DLY_RX);
+
+    switch (dly_op_state_get(dly_ts_id))
     {
-        assert(false);
+        case DELAYED_TRX_OP_STATE_PENDING:
+        {
+            nrf_802154_pib_channel_set(m_rx_channel);
+
+            if (nrf_802154_request_channel_update())
+            {
+                (void)nrf_802154_request_receive(NRF_802154_TERM_802154,
+                                                 REQ_ORIG_DELAYED_TRX,
+                                                 dly_rx_result_notify,
+                                                 true);
+            }
+            else
+            {
+                dly_rx_result_notify(false);
+            }
+
+            break;
+        }
+
+        case DELAYED_TRX_OP_STATE_STOPPED:
+            break;
+
+        default:
+            assert(false);
+            break;
     }
 }
 
@@ -397,11 +397,7 @@ bool nrf_802154_delayed_trx_transmit(const uint8_t * p_data,
                                      uint32_t        dt,
                                      uint8_t         channel)
 {
-    bool     result;
-    uint16_t timeslot_length;
-    bool     ack;
-
-    result = dly_op_state_get(RSCH_DLY_TX) == DELAYED_TRX_OP_STATE_STOPPED;
+    bool result = dly_op_state_get(RSCH_DLY_TX) == DELAYED_TRX_OP_STATE_STOPPED;
 
     if (result)
     {
@@ -413,9 +409,6 @@ bool nrf_802154_delayed_trx_transmit(const uint8_t * p_data,
             dt -= nrf_802154_cca_before_tx_duration_get();
         }
 
-        ack             = p_data[ACK_REQUEST_OFFSET] & ACK_REQUEST_BIT;
-        timeslot_length = nrf_802154_tx_duration_get(p_data[0], cca, ack);
-
         mp_tx_data   = p_data;
         m_tx_cca     = cca;
         m_tx_channel = channel;
@@ -424,11 +417,10 @@ bool nrf_802154_delayed_trx_transmit(const uint8_t * p_data,
         {
             .t0                = t0,
             .dt                = dt,
-            .length            = timeslot_length,
             .prio              = RSCH_PRIO_TX,
             .id                = RSCH_DLY_TX,
             .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
-            .started_callback  = timeslot_started_callback,
+            .started_callback  = tx_timeslot_started_callback,
         };
 
         result = dly_op_request(&dly_ts_param);
@@ -442,17 +434,12 @@ bool nrf_802154_delayed_trx_receive(uint32_t t0,
                                     uint32_t timeout,
                                     uint8_t  channel)
 {
-    bool     result;
-    uint16_t timeslot_length;
-
-    result = dly_op_state_get(RSCH_DLY_RX) == DELAYED_TRX_OP_STATE_STOPPED;
+    bool result = dly_op_state_get(RSCH_DLY_RX) == DELAYED_TRX_OP_STATE_STOPPED;
 
     if (result)
     {
         dt -= RX_SETUP_TIME;
         dt -= RX_RAMP_UP_TIME;
-
-        timeslot_length = timeout + nrf_802154_rx_duration_get(MAX_PACKET_SIZE, true);
 
         m_timeout_timer.dt        = timeout + RX_RAMP_UP_TIME;
         m_timeout_timer.callback  = notify_rx_timeout;
@@ -467,11 +454,10 @@ bool nrf_802154_delayed_trx_receive(uint32_t t0,
         {
             .t0                = t0,
             .dt                = dt,
-            .length            = timeslot_length,
             .prio              = RSCH_PRIO_IDLE_LISTENING,
             .id                = RSCH_DLY_RX,
             .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
-            .started_callback  = timeslot_started_callback,
+            .started_callback  = rx_timeslot_started_callback,
         };
 
         result = dly_op_request(&dly_ts_param);
