@@ -115,9 +115,6 @@ void nrf_802154_rsch_continuous_prio_changed(rsch_prio_t prio)
 
     if (crit_sect_success)
     {
-        // A change of RSCH state occurred and entered the critical section successfully.
-        // The pending event has become obsolete and is irrelevant now.
-        (void)rsch_pending_evt_clear();
         nrf_802154_rsch_crit_sect_prio_changed(prio);
         nrf_802154_critical_section_exit();
     }

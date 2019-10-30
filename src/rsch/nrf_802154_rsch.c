@@ -289,7 +289,14 @@ static inline void notify_core(void)
 {
     nrf_802154_log_entry(notify_core, 2);
 
-    nrf_802154_rsch_continuous_prio_changed(approved_prio_lvl_get());
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    rsch_prio_t approved_prio = approved_prio_lvl_get();
+
+    __set_PRIMASK(primask);
+
+    nrf_802154_rsch_continuous_prio_changed(approved_prio);
 
     nrf_802154_log_exit(notify_core, 2);
 }
