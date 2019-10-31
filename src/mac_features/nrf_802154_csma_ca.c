@@ -60,7 +60,6 @@ static uint8_t m_be;                     ///< Backoff exponent, which is related
 
 static const uint8_t * mp_data;          ///< Pointer to a buffer containing PHR and PSDU of the frame being transmitted.
 static bool            m_is_running;     ///< Indicates if CSMA-CA procedure is running.
-static uint32_t        m_frame_duration; ///< Duration of the frame being transmitted in microseconds.
 
 /**
  * @brief Perform appropriate actions for busy channel conditions.
@@ -101,7 +100,7 @@ static void procedure_stop(void)
  */
 static void notify_busy_channel(bool result)
 {
-    if (!result && (m_nb >= (NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS - 1)))
+    if (!result && (m_nb >= (nrf_802154_pib_csmaca_max_backoffs_get() - 1)))
     {
         nrf_802154_notify_transmit_failed(mp_data, NRF_802154_TX_ERROR_BUSY_CHANNEL);
     }
@@ -145,6 +144,14 @@ static void random_backoff_start(void)
 {
     uint8_t backoff_periods = nrf_802154_random_get() % (1 << m_be);
 
+    // If maximum number of CSMA-CA backoffs is equal to 0, this function is called only once
+    // and no more backoffs will follow. Forcing the first and only backoff to 0 has the same
+    // effect as no backoff at all.
+    if (0 == nrf_802154_pib_csmaca_max_backoffs_get())
+    {
+        backoff_periods = 0;
+    }
+
     rsch_dly_ts_param_t backoff_ts_param =
     {
         .t0               = nrf_802154_timer_sched_time_get(),
@@ -178,12 +185,12 @@ static bool channel_busy(void)
 
         m_nb++;
 
-        if (m_be < NRF_802154_CSMA_CA_MAX_BE)
+        if (m_be < nrf_802154_pib_csmaca_max_be_get())
         {
             m_be++;
         }
 
-        if (m_nb < NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS)
+        if (m_nb < nrf_802154_pib_csmaca_max_backoffs_get())
         {
             random_backoff_start();
             result = false;
@@ -203,13 +210,10 @@ void nrf_802154_csma_ca_start(const uint8_t * p_data)
 {
     assert(!procedure_is_running());
 
-    mp_data          = p_data;
-    m_nb             = 0;
-    m_be             = NRF_802154_CSMA_CA_MIN_BE;
-    m_is_running     = true;
-    m_frame_duration = nrf_802154_tx_duration_get(p_data[0],
-                                                  true,
-                                                  nrf_802154_frame_parser_ar_bit_is_set(p_data));
+    mp_data      = p_data;
+    m_nb         = 0;
+    m_be         = nrf_802154_pib_csmaca_min_be_get();
+    m_is_running = true;
 
     random_backoff_start();
 }

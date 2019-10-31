@@ -713,6 +713,37 @@ void nrf_802154_transmit_csma_ca(const uint8_t * p_data, uint8_t length)
 }
 
 #endif // NRF_802154_USE_RAW_API
+
+bool nrf_802154_csma_ca_min_be_set(uint8_t min_be)
+{
+    return nrf_802154_pib_csmaca_min_be_set(min_be);
+}
+
+uint8_t nrf_802154_csma_ca_min_be_get(void)
+{
+    return nrf_802154_pib_csmaca_min_be_get();
+}
+
+bool nrf_802154_csma_ca_max_be_set(uint8_t max_be)
+{
+    return nrf_802154_pib_csmaca_max_be_set(max_be);
+}
+
+uint8_t nrf_802154_csma_ca_max_be_get(void)
+{
+    return nrf_802154_pib_csmaca_max_be_get();
+}
+
+bool nrf_802154_csma_ca_max_backoffs_set(uint8_t max_backoffs)
+{
+    return nrf_802154_pib_csmaca_max_backoffs_set(max_backoffs);
+}
+
+uint8_t nrf_802154_csma_ca_max_backoffs_get(void)
+{
+    return nrf_802154_pib_csmaca_max_backoffs_get();
+}
+
 #endif // NRF_802154_CSMA_CA_ENABLED
 
 #if NRF_802154_ACK_TIMEOUT_ENABLED
