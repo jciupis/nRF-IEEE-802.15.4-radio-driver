@@ -147,12 +147,12 @@ static void random_backoff_start(void)
 
     rsch_dly_ts_param_t backoff_ts_param =
     {
-        .t0                = nrf_802154_timer_sched_time_get(),
-        .dt                = backoff_periods * UNIT_BACKOFF_PERIOD,
-        .prio              = RSCH_PRIO_IDLE_LISTENING,
-        .id                = RSCH_DLY_CSMACA,
-        .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_MANUAL,
-        .started_callback  = frame_transmit,
+        .t0               = nrf_802154_timer_sched_time_get(),
+        .dt               = backoff_periods * UNIT_BACKOFF_PERIOD,
+        .prio             = RSCH_PRIO_IDLE_LISTENING,
+        .id               = RSCH_DLY_CSMACA,
+        .type             = RSCH_DLY_TS_TYPE_RELAXED,
+        .started_callback = frame_transmit,
     };
 
     // If Coex precondition should be requested immediately, preconditions priority must be leveraged

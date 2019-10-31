@@ -314,7 +314,7 @@ static void dly_rx_result_notify(bool result)
 /**
  * Notify that the previously requested delayed TX timeslot has started just now.
  *
- * @param[in]  dly_ts_id  Type of the started timeslot.
+ * @param[in]  dly_ts_id  ID of the started timeslot.
  */
 static void tx_timeslot_started_callback(rsch_dly_ts_id_t dly_ts_id)
 {
@@ -355,7 +355,7 @@ static void tx_timeslot_started_callback(rsch_dly_ts_id_t dly_ts_id)
 /**
  * Notify that the previously requested delayed RX timeslot has started just now.
  *
- * @param[in]  dly_ts_id  Type of the started timeslot.
+ * @param[in]  dly_ts_id  ID of the started timeslot.
  */
 static void rx_timeslot_started_callback(rsch_dly_ts_id_t dly_ts_id)
 {
@@ -415,12 +415,12 @@ bool nrf_802154_delayed_trx_transmit(const uint8_t * p_data,
 
         rsch_dly_ts_param_t dly_ts_param =
         {
-            .t0                = t0,
-            .dt                = dt,
-            .prio              = RSCH_PRIO_TX,
-            .id                = RSCH_DLY_TX,
-            .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
-            .started_callback  = tx_timeslot_started_callback,
+            .t0               = t0,
+            .dt               = dt,
+            .prio             = RSCH_PRIO_TX,
+            .id               = RSCH_DLY_TX,
+            .type             = RSCH_DLY_TS_TYPE_PRECISE,
+            .started_callback = tx_timeslot_started_callback,
         };
 
         result = dly_op_request(&dly_ts_param);
@@ -452,12 +452,12 @@ bool nrf_802154_delayed_trx_receive(uint32_t t0,
 
         rsch_dly_ts_param_t dly_ts_param =
         {
-            .t0                = t0,
-            .dt                = dt,
-            .prio              = RSCH_PRIO_IDLE_LISTENING,
-            .id                = RSCH_DLY_RX,
-            .prec_req_strategy = RSCH_PREC_REQ_STRATEGY_SHORTEST,
-            .started_callback  = rx_timeslot_started_callback,
+            .t0               = t0,
+            .dt               = dt,
+            .prio             = RSCH_PRIO_IDLE_LISTENING,
+            .id               = RSCH_DLY_RX,
+            .type             = RSCH_DLY_TS_TYPE_PRECISE,
+            .started_callback = rx_timeslot_started_callback,
         };
 
         result = dly_op_request(&dly_ts_param);

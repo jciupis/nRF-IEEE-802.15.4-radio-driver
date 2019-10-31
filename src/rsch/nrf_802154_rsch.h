@@ -100,9 +100,20 @@ typedef enum
  */
 typedef enum
 {
-    RSCH_PREC_REQ_STRATEGY_MANUAL,   ///< Preconditions requested immediately and released only by @ref nrf_802154_rsch_delayed_timeslot_cancel call.
-    RSCH_PREC_REQ_STRATEGY_SHORTEST, ///< Preconditions requested as late as possible and released as soon as possible.
-} rsch_dly_ts_prec_req_strategy_t;
+    /** The following delayed timeslot type requires preconditions to be requested immediately
+     *  and released only by @ref nrf_802154_rsch_delayed_timeslot_cancel call. It is scheduled
+     *  irrespectively of current approved preconditions, which might introduce additional delays.
+     *  This delayed timeslot type also supports requests with target time in the past.
+     */
+    RSCH_DLY_TS_TYPE_RELAXED,
+
+    /** The following delayed timeslot type requires preconditions to be requested as late
+     *  as possible to ensure they are ramped up on target time, and released as soon as possible.
+     *  This mode of operation does not allow for requests in the past and puts strict conditions
+     *  on preconditions that must be approved when the scheduled operation starts.
+     */
+    RSCH_DLY_TS_TYPE_PRECISE,
+} rsch_dly_ts_type_t;
 
 /**
  * @brief Function pointer used for notifying about delayed timeslot start.
@@ -114,12 +125,12 @@ typedef void (* rsch_dly_ts_started_callback_t)(rsch_dly_ts_id_t dly_ts_id);
  */
 typedef struct
 {
-    uint32_t                        t0;                ///< Base time of the timestamp of the timeslot start, in microseconds.
-    uint32_t                        dt;                ///< Time delta between @p t0 and the timestamp of the timeslot start, in microseconds.
-    rsch_prio_t                     prio;              ///< Priority level required for the delayed timeslot.
-    rsch_dly_ts_id_t                id;                ///< Type of the requested timeslot.
-    rsch_dly_ts_prec_req_strategy_t prec_req_strategy; ///< Precondition request strategy.
-    rsch_dly_ts_started_callback_t  started_callback;  ///< Callback called when delayed timeslot starts.
+    uint32_t                       t0;               ///< Base time of the timestamp of the timeslot start, in microseconds.
+    uint32_t                       dt;               ///< Time delta between @p t0 and the timestamp of the timeslot start, in microseconds.
+    rsch_prio_t                    prio;             ///< Priority level required for the delayed timeslot.
+    rsch_dly_ts_id_t               id;               ///< ID of the requested timeslot.
+    rsch_dly_ts_type_t             type;             ///< Type of the requested timeslot.
+    rsch_dly_ts_started_callback_t started_callback; ///< Callback called when delayed timeslot starts.
 } rsch_dly_ts_param_t;
 
 /**
@@ -200,7 +211,7 @@ bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_
 /**
  * @brief Cancels a requested future timeslot.
  *
- * @param[in] dly_ts_id  Type of the requested timeslot.
+ * @param[in] dly_ts_id  ID of the requested timeslot.
  *
  * @retval true     Scheduled timeslot has been cancelled.
  * @retval false    No scheduled timeslot has been requested (nothing to cancel).
