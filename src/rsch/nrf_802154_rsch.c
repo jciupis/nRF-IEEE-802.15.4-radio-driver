@@ -383,6 +383,7 @@ static void delayed_timeslot_prec_request(void * p_context)
 static bool precise_delayed_timeslot_request(dly_ts_t                  * p_dly_ts,
                                              const rsch_dly_ts_param_t * p_param)
 {
+    // Assert that no operation is scheduled for the selected slot
     assert(p_dly_ts->param.prio == RSCH_PRIO_IDLE);
     assert(!nrf_802154_timer_sched_is_running(&p_dly_ts->timer));
 
