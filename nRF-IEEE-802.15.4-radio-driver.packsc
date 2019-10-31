@@ -22,8 +22,10 @@
             "src/mac_features/nrf_802154_frame_parser.h",
             "src/mac_features/ack_generator/nrf_802154_ack_data.h",
             "src/mac_features/ack_generator/nrf_802154_ack_generator.h",
+            "src/platform/random/nrf_802154_random.h",
             "src/rsch/nrf_802154_rsch.h",
-            "src/rsch/nrf_802154_rsch_crit_sect.h"
+            "src/rsch/nrf_802154_rsch_crit_sect.h",
+            "src/timer_scheduler/nrf_802154_timer_sched.h"
         ],
         "_replacements": [
             {
@@ -200,18 +202,22 @@
                     "cmock\\mock_nrf_802154_pib.c",
                     "cmock\\mock_nrf_802154_priority_drop.c",
                     "cmock\\mock_nrf_802154_procedures_duration.c",
+                    "cmock\\mock_nrf_802154_random.c",
                     "cmock\\mock_nrf_802154_request.c",
                     "cmock\\mock_nrf_802154_rsch.c",
                     "cmock\\mock_nrf_802154_rsch_crit_sect.c",
                     "cmock\\mock_nrf_802154_rssi.c",
                     "cmock\\mock_nrf_802154_rx_buffer.c",
-                    "cmock\\mock_nrf_802154_timer_coord.c"
+                    "cmock\\mock_nrf_802154_timer_coord.c",
+                    "cmock\\mock_nrf_802154_timer_sched.c"
                 ],
                 "_includes": [
                     "cmock",
                     "src/mac_features",
                     "src/mac_features/ack_generator",
-                    "src/rsch"
+                    "src/platform/random",
+                    "src/rsch",
+                    "src/timer_scheduler"
                 ],
                 "_name": "cmock"
             },
