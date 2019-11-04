@@ -221,17 +221,21 @@ static inline void all_prec_update(void)
                 nrf_raal_continuous_mode_exit();
                 prec_approved_prio_set(RSCH_PREC_RAAL, RSCH_PRIO_IDLE);
             }
+            else if (prev_prio == RSCH_PRIO_IDLE)
+            {
+                // If the previously requested priority is IDLE,
+                // both HFCLK and RAAL preconditions should be idle.
+                assert(m_approved_prios[RSCH_PREC_HFCLK] == RSCH_PRIO_IDLE);
+                assert(m_approved_prios[RSCH_PREC_RAAL] == RSCH_PRIO_IDLE);
+
+                nrf_802154_priority_drop_hfclk_stop_terminate();
+                nrf_802154_clock_hfclk_start();
+
+                nrf_raal_continuous_mode_enter();
+            }
             else
             {
-                if (m_approved_prios[RSCH_PREC_HFCLK] == RSCH_PRIO_IDLE)
-                {
-                    nrf_802154_priority_drop_hfclk_stop_terminate();
-                    nrf_802154_clock_hfclk_start();
-                }
-                if (m_approved_prios[RSCH_PREC_RAAL] == RSCH_PRIO_IDLE)
-                {
-                    nrf_raal_continuous_mode_enter();
-                }
+                // Intentionally empty
             }
 
             nrf_802154_wifi_coex_prio_request(new_prio);
