@@ -222,9 +222,9 @@ nrf_802154_coex_tx_request_mode_t nrf_802154_pib_coex_tx_request_mode_get(void);
 
 /**
  * @brief Sets the minimum value of the backoff exponent (BE) in the CSMA-CA algorithm.
- * 
+ *
  * @param[in] min_be  Minimum value of the backoff exponent.
- * 
+ *
  * @retval true    When value provided by @p min_be is allowed by the protocol.
  * @retval false   Otherwise.
  */
@@ -232,16 +232,16 @@ bool nrf_802154_pib_csmaca_min_be_set(uint8_t min_be);
 
 /**
  * @brief Gets the minimum value of the backoff exponent (BE) in the CSMA-CA algorithm.
- * 
+ *
  * @return Current minimum value of the backoff exponent.
  */
 uint8_t nrf_802154_pib_csmaca_min_be_get(void);
 
 /**
  * @brief Sets the maximum value of the backoff exponent (BE) in the CSMA-CA algorithm.
- * 
+ *
  * @param[in] max_be  Maximum value of the backoff exponent.
- * 
+ *
  * @retval true    When value provided by @p max_be is allowed by the protocol.
  * @retval false   Otherwise.
  */
@@ -249,7 +249,7 @@ bool nrf_802154_pib_csmaca_max_be_set(uint8_t max_be);
 
 /**
  * @brief Gets the maximum value of the backoff exponent (BE) in the CSMA-CA algorithm.
- * 
+ *
  * @return Current maximum value of the backoff exponent.
  */
 uint8_t nrf_802154_pib_csmaca_max_be_get(void);
@@ -257,9 +257,9 @@ uint8_t nrf_802154_pib_csmaca_max_be_get(void);
 /**
  * @brief Sets the maximum number of backoffs the CSMA-CA algorithm will attempt before declaring
  *        a channel access failure.
- * 
+ *
  * @param[in] max_backoffs  Maximum number of backoffs.
- * 
+ *
  * @retval true    When value provided by @p max_backoffs is allowed by the protocol.
  * @retval false   Otherwise.
  */
@@ -268,7 +268,7 @@ bool nrf_802154_pib_csmaca_max_backoffs_set(uint8_t max_backoffs);
 /**
  * @brief Gets the maximum number of backoffs the CSMA-CA algorithm will attempt before declaring
  *        a channel access failure.
- * 
+ *
  * @return Current maximum number of backoffs.
  */
 uint8_t nrf_802154_pib_csmaca_max_backoffs_get(void);

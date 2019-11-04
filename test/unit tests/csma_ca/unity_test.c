@@ -258,7 +258,7 @@ static void verify_channel_empty_scenario(uint8_t min_be, uint8_t max_be)
                 // Mocks for nrf_802154_csma_ca_start()
                 mock_csma_ca_start();
 
-                // The number of failed backoffs must be greater than one to perform more than the last backoff
+                // The number of failed backoffs must be non-zero to perform more than the last backoff
                 if (failed_backoffs > 0)
                 {
                     // Mock failed attempts followed by a reschedule

@@ -46,10 +46,10 @@
 #include "nrf_802154_utils.h"
 #include "fal/nrf_802154_fal.h"
 
-#define CSMACA_MIN_BE_MINIMUM 0 ///< The minimum value of the backoff exponent (BE) allowed by the protocol specification
+#define CSMACA_MIN_BE_MINIMUM       0 ///< The minimum value of the backoff exponent (BE) allowed by the protocol specification
 
-#define CSMACA_MAX_BE_MINIMUM 3 ///< The minimum value of the maximum value of the backoff exponent (BE) allowed by the protocol specification
-#define CSMACA_MAX_BE_MAXIMUM 8 ///< The maximum value of the backoff exponent (BE) allowed by the protocol specification
+#define CSMACA_MAX_BE_MINIMUM       3 ///< The minimum value of the maximum value of the backoff exponent (BE) allowed by the protocol specification
+#define CSMACA_MAX_BE_MAXIMUM       8 ///< The maximum value of the backoff exponent (BE) allowed by the protocol specification
 
 #define CSMACA_MAX_BACKOFFS_MINIMUM 0 ///< The minimum value of the maximum number of CSMA-CA backoffs allowed by the protocol specification
 #define CSMACA_MAX_BACKOFFS_MAXIMUM 5 ///< The maximum number of the CSMA-CA backoffs allowed by the protocol specification
