@@ -111,19 +111,26 @@ void nrf_802154_rsch_crit_sect_prio_request(rsch_prio_t prio)
 
 void nrf_802154_rsch_continuous_prio_changed(rsch_prio_t prio)
 {
-    bool crit_sect_success = nrf_802154_critical_section_enter();
+    bool crit_sect_success = false;
 
-    if (crit_sect_success)
+    crit_sect_success = nrf_802154_critical_section_enter();
+
+    // If we managed to enter critical section, but there is already a pending event,
+    // it means that the Critical Section module is about to make one more iteration of the
+    // critical section exit procedure. To prevent race in continuous mode priorities notification,
+    // we do not notify directly, but just update the pending event.
+    if (crit_sect_success && rsch_pending_evt_is_none())
     {
-        // A change of RSCH state occurred and entered the critical section successfully.
-        // The pending event has become obsolete and is irrelevant now.
-        (void)rsch_pending_evt_clear();
         nrf_802154_rsch_crit_sect_prio_changed(prio);
-        nrf_802154_critical_section_exit();
     }
     else
     {
         rsch_pending_evt_set(prio);
+    }
+
+    if (crit_sect_success)
+    {
+        nrf_802154_critical_section_exit();
     }
 }
 

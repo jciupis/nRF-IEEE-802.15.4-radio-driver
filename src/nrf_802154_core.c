@@ -215,10 +215,24 @@ static void received_frame_notify(uint8_t * p_data)
                                lqi_get(p_data));            // lqi
 }
 
+/** Allow nesting critical sections and notify MAC layer that a frame was received. */
+static void received_frame_notify_and_nesting_allow(uint8_t * p_data)
+{
+    nrf_802154_critical_section_nesting_allow();
+
+    received_frame_notify(p_data);
+
+    nrf_802154_critical_section_nesting_deny();
+}
+
 /** Notify MAC layer that receive procedure failed. */
 static void receive_failed_notify(nrf_802154_rx_error_t error)
 {
+    nrf_802154_critical_section_nesting_allow();
+
     nrf_802154_notify_receive_failed(error);
+
+    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that transmission of requested frame has started. */
@@ -249,8 +263,12 @@ static void transmitted_frame_notify(uint8_t * p_ack, int8_t power, uint8_t lqi)
 {
     const uint8_t * p_frame = mp_tx_data;
 
+    nrf_802154_critical_section_nesting_allow();
+
     nrf_802154_core_hooks_transmitted(p_frame);
     nrf_802154_notify_transmitted(p_frame, p_ack, power, lqi);
+
+    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that transmission procedure failed. */
@@ -264,16 +282,34 @@ static void transmit_failed_notify(nrf_802154_tx_error_t error)
     }
 }
 
+/** Allow nesting critical sections and notify MAC layer that transmission procedure failed. */
+static void transmit_failed_notify_and_nesting_allow(nrf_802154_tx_error_t error)
+{
+    nrf_802154_critical_section_nesting_allow();
+
+    transmit_failed_notify(error);
+
+    nrf_802154_critical_section_nesting_deny();
+}
+
 /** Notify MAC layer that energy detection procedure ended. */
 static void energy_detected_notify(uint8_t result)
 {
+    nrf_802154_critical_section_nesting_allow();
+
     nrf_802154_notify_energy_detected(result);
+
+    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Notify MAC layer that CCA procedure ended. */
 static void cca_notify(bool result)
 {
+    nrf_802154_critical_section_nesting_allow();
+
     nrf_802154_notify_cca(result);
+
+    nrf_802154_critical_section_nesting_deny();
 }
 
 /** Check if timeslot is currently granted.
@@ -676,12 +712,20 @@ static bool current_operation_terminate(nrf_802154_term_t term_lvl,
 /** Enter Sleep state. */
 static void sleep_init(void)
 {
+    nrf_802154_trx_disable();
     nrf_802154_timer_coord_stop();
 }
 
 /** Initialize Falling Asleep operation. */
 static void falling_asleep_init(void)
 {
+    if (!timeslot_is_granted())
+    {
+        sleep_init();
+        state_set(RADIO_STATE_SLEEP);
+        return;
+    }
+
     if (nrf_802154_trx_go_idle())
     {
         // There will be nrf_802154_trx_in_idle call, where we will continue processing
@@ -927,14 +971,14 @@ static void on_timeslot_ended(void)
             case RADIO_STATE_TX_ACK:
                 state_set(RADIO_STATE_RX);
                 mp_current_rx_buffer->free = false;
-                received_frame_notify(mp_current_rx_buffer->data);
+                received_frame_notify_and_nesting_allow(mp_current_rx_buffer->data);
                 break;
 
             case RADIO_STATE_CCA_TX:
             case RADIO_STATE_TX:
             case RADIO_STATE_RX_ACK:
                 state_set(RADIO_STATE_RX);
-                transmit_failed_notify(NRF_802154_TX_ERROR_TIMESLOT_ENDED);
+                transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_TIMESLOT_ENDED);
                 break;
 
             case RADIO_STATE_ED:
@@ -987,14 +1031,14 @@ static void on_preconditions_denied(radio_state_t state)
         case RADIO_STATE_TX_ACK:
             state_set(RADIO_STATE_RX);
             mp_current_rx_buffer->free = false;
-            received_frame_notify(mp_current_rx_buffer->data);
+            received_frame_notify_and_nesting_allow(mp_current_rx_buffer->data);
             break;
 
         case RADIO_STATE_CCA_TX:
         case RADIO_STATE_TX:
         case RADIO_STATE_RX_ACK:
             state_set(RADIO_STATE_RX);
-            transmit_failed_notify(NRF_802154_TX_ERROR_ABORTED);
+            transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_ABORTED);
             break;
 
         case RADIO_STATE_ED:
@@ -1332,7 +1376,7 @@ void nrf_802154_trx_receive_frame_received(void)
             nrf_802154_pib_promiscuous_get())
         {
             mp_current_rx_buffer->free = false;
-            received_frame_notify(p_received_data);
+            received_frame_notify_and_nesting_allow(p_received_data);
         }
 
         return;
@@ -1371,7 +1415,7 @@ void nrf_802154_trx_receive_frame_received(void)
                     state_set(RADIO_STATE_RX);
                     rx_init(true);
 
-                    received_frame_notify(p_received_data);
+                    received_frame_notify_and_nesting_allow(p_received_data);
                 }
             }
             else
@@ -1381,7 +1425,7 @@ void nrf_802154_trx_receive_frame_received(void)
                 state_set(RADIO_STATE_RX);
                 rx_init(true);
 
-                received_frame_notify(p_received_data);
+                received_frame_notify_and_nesting_allow(p_received_data);
             }
         }
         else
@@ -1399,7 +1443,7 @@ void nrf_802154_trx_receive_frame_received(void)
 
                 rx_init(true);
 
-                received_frame_notify(p_received_data);
+                received_frame_notify_and_nesting_allow(p_received_data);
             }
             else
             {
@@ -1451,7 +1495,7 @@ void nrf_802154_trx_transmit_ack_transmitted(void)
 
     rx_init(true);
 
-    received_frame_notify(p_received_data);
+    received_frame_notify_and_nesting_allow(p_received_data);
 }
 
 void nrf_802154_trx_transmit_frame_transmitted(void)
@@ -1575,7 +1619,7 @@ static void on_bad_ack(void)
 
     rx_init(true);
 
-    transmit_failed_notify(NRF_802154_TX_ERROR_INVALID_ACK);
+    transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_INVALID_ACK);
 }
 
 void nrf_802154_trx_receive_ack_received(void)
@@ -1624,7 +1668,7 @@ void nrf_802154_trx_transmit_frame_ccabusy(void)
     state_set(RADIO_STATE_RX);
     rx_init(true);
 
-    transmit_failed_notify(NRF_802154_TX_ERROR_BUSY_CHANNEL);
+    transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_BUSY_CHANNEL);
 }
 
 void nrf_802154_trx_energy_detection_finished(uint8_t ed_sample)
@@ -1703,18 +1747,8 @@ bool nrf_802154_core_sleep(nrf_802154_term_t term_lvl)
 
             if (result)
             {
-                // Inverted order of calls in the if-else clause below is intentional
-                // and is necessary to prevent RAAL race conditions.
-                if (!timeslot_is_granted())
-                {
-                    sleep_init();
-                    state_set(RADIO_STATE_SLEEP);
-                }
-                else
-                {
-                    state_set(RADIO_STATE_FALLING_ASLEEP);
-                    falling_asleep_init();
-                }
+                state_set(RADIO_STATE_FALLING_ASLEEP);
+                falling_asleep_init();
             }
         }
 

@@ -2063,10 +2063,7 @@ void nrf_802154_radio_irq_handler(void)
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_IRQ_HANDLER);
 
     // Prevent interrupting of this handler by requests from higher priority code.
-    bool result = nrf_802154_critical_section_enter();
-
-    assert(result);
-    (void)result;
+    nrf_802154_critical_section_forcefully_enter();
 
 #if defined(NRF_RADIO_EVENT_HELPER1)
     // Note: For NRF_RADIO_EVENT_HELPER1 we enable interrupt through EGU.

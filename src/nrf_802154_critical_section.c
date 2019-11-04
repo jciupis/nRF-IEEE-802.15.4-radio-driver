@@ -47,10 +47,13 @@
 
 #include <nrf.h>
 
-#define CMSIS_IRQ_NUM_VECTACTIVE_DIFF 16                           ///< Offset in exception number of external interrupts according to ARM Archuitecture Reference Manual
+#define CMSIS_IRQ_NUM_VECTACTIVE_DIFF                 16
 
-static volatile uint8_t m_nested_critical_section_counter;         ///< Counter of nested critical sections
-static volatile uint8_t m_nested_critical_section_current_context; ///< Execution context of the current critical section
+#define NESTED_CRITICAL_SECTION_ALLOWED_PRIORITY_NONE (-1)
+
+static volatile uint8_t m_critical_section_monitor;                 ///< Monitors each critical section enter operation
+static volatile uint8_t m_nested_critical_section_counter;          ///< Counter of nested critical sections
+static volatile int8_t  m_nested_critical_section_allowed_priority; ///< Indicator if nested critical sections are currently allowed
 
 /***************************************************************************************************
  * @section Critical sections management
@@ -82,120 +85,115 @@ static void radio_critical_section_exit(void)
     }
 }
 
-/** @brief Get the context the code is currently executed from.
+/** @brief Convert active priority value to int8_t type.
  *
- * @return External interrupt number with @ref CMSIS_IRQ_NUM_VECTACTIVE_DIFF offset in case of
- *         an interrupt context or 0 when the code is executed from the main thread.
+ * @param[in]  active_priority  Active priority in uint32_t format
+ *
+ * @return Active_priority value in int8_t format.
  */
-static uint8_t current_execution_context_get(void)
+static int8_t active_priority_convert(uint32_t active_priority)
 {
-    return (uint8_t)((SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) >> SCB_ICSR_VECTACTIVE_Pos);
+    return active_priority == UINT32_MAX ? INT8_MAX : (int8_t)active_priority;
 }
 
-static bool critical_section_enter(void)
+/** @brief Check if active vector priority is equal to priority that allows nested crit sections.
+ *
+ * @retval true   Active vector priority allows nested critical sections.
+ * @retval false  Active vector priority denies nested critical sections.
+ */
+static bool nested_critical_section_is_allowed_in_this_context(void)
 {
-    uint8_t  counter;
-    bool     result          = false;
-    uint32_t interrupt_state = __get_PRIMASK();
+    return m_nested_critical_section_allowed_priority ==
+           active_priority_convert(nrf_802154_critical_section_active_vector_priority_get());
+}
 
-    __disable_irq();
-    __DSB();
-    __ISB();
+static bool critical_section_enter(bool forced)
+{
+    bool    result = false;
+    uint8_t cnt;
 
-    // Operate on local copies of the volatile variables for faster execution.
-    counter = m_nested_critical_section_counter;
-
-    // Enter critical section only if it is free or occupied by the same context.
-    if (counter == 0)
+    if (forced ||
+        (m_nested_critical_section_counter == 0) ||
+        nested_critical_section_is_allowed_in_this_context())
     {
-        counter++;
+        do
+        {
+            cnt = __LDREXB(&m_nested_critical_section_counter);
+
+            assert(cnt < UINT8_MAX);
+        }
+        while (__STREXB(cnt + 1, &m_nested_critical_section_counter));
 
         nrf_802154_critical_section_rsch_enter();
         nrf_802154_lp_timer_critical_section_enter();
         radio_critical_section_enter();
+        __DSB();
+        __ISB();
 
-        m_nested_critical_section_counter         = counter;
-        m_nested_critical_section_current_context = current_execution_context_get();
-
-        result = true;
-    }
-    else if (m_nested_critical_section_current_context == current_execution_context_get())
-    {
-        counter++;
-        m_nested_critical_section_counter = counter;
+        m_critical_section_monitor++;
 
         result = true;
     }
-    else
-    {
-        // Intentionally empty
-    }
-
-    __set_PRIMASK(interrupt_state);
 
     return result;
 }
 
 static void critical_section_exit(void)
 {
-    bool     retry = false;
-    uint8_t  counter;
-    uint32_t interrupt_state = __get_PRIMASK();
+    uint8_t     cnt = m_nested_critical_section_counter;
+    uint8_t     monitor;
+    uint8_t     atomic_cnt;
+    static bool exiting_crit_sect;
+    bool        result;
 
-    // Assert that the caller has the right to exit the critical section.
-    assert(m_nested_critical_section_current_context == current_execution_context_get());
-
-    // Operate on local copy of the volatile variable for faster execution.
-    counter = m_nested_critical_section_counter;
-
-    // Assert that every exit() call is paired with a successful enter() call
-    assert(counter > 0);
+    assert(cnt > 0);
 
     do
     {
-        // Exit RSCH critical section with enabled interrupts (it might take some time).
-        if (counter == 1)
+        monitor = m_critical_section_monitor;
+
+        // If critical section is not nested exit critical section
+        if (cnt == 1)
         {
+            assert(!exiting_crit_sect);
+            (void)exiting_crit_sect;
+            exiting_crit_sect = true;
+
             nrf_802154_critical_section_rsch_exit();
-        }
-
-        // Exit radio & LP timer critical sections atomically.
-        __disable_irq();
-        __DSB();
-        __ISB();
-
-        if (counter == 1)
-        {
             radio_critical_section_exit();
             nrf_802154_lp_timer_critical_section_exit();
+
+            exiting_crit_sect = false;
         }
 
-        counter--;
-        m_nested_critical_section_counter = counter;
-
-        __set_PRIMASK(interrupt_state);
-
-        // It might have happened that after exiting RSCH critical section, higher priority
-        // interrupt caused a change of state. Such case is handled below
-        if (nrf_802154_critical_section_rsch_event_is_pending())
+        do
         {
-            bool result = critical_section_enter();
-
-            assert(result);
-            (void)result;
-
-            // Since critical section was entered, counter should be incremented to reflect the
-            // current value of the static counter. It's not an assignment to speed up the execution
-            counter++;
-
-            retry = true;
+            atomic_cnt = __LDREXB(&m_nested_critical_section_counter);
+            assert(atomic_cnt == cnt);
         }
-        else
+        while (__STREXB(atomic_cnt - 1, &m_nested_critical_section_counter));
+
+        // If critical section is not nested verify if during exit procedure RSCH notified
+        // change of state or critical section was visited by higher priority IRQ meantime.
+        if (cnt == 1)
         {
-            retry = false;
+            // Check if critical section must be exited again.
+            if (nrf_802154_critical_section_rsch_event_is_pending() ||
+                (monitor != m_critical_section_monitor))
+            {
+                result = critical_section_enter(false);
+                assert(result);
+                (void)result;
+
+                continue;
+            }
+            else
+            {
+                break;
+            }
         }
     }
-    while (retry);
+    while (cnt == 1);
 }
 
 /***************************************************************************************************
@@ -204,8 +202,8 @@ static void critical_section_exit(void)
 
 void nrf_802154_critical_section_init(void)
 {
-    m_nested_critical_section_counter         = 0;
-    m_nested_critical_section_current_context = 0;
+    m_nested_critical_section_counter          = 0;
+    m_nested_critical_section_allowed_priority = NESTED_CRITICAL_SECTION_ALLOWED_PRIORITY_NONE;
 }
 
 bool nrf_802154_critical_section_enter(void)
@@ -214,11 +212,24 @@ bool nrf_802154_critical_section_enter(void)
 
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CRIT_SECT_ENTER);
 
-    result = critical_section_enter();
+    result = critical_section_enter(false);
 
     nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CRIT_SECT_ENTER);
 
     return result;
+}
+
+void nrf_802154_critical_section_forcefully_enter(void)
+{
+    bool critical_section_entered;
+
+    nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_CRIT_SECT_ENTER);
+
+    critical_section_entered = critical_section_enter(true);
+    assert(critical_section_entered);
+    (void)critical_section_entered;
+
+    nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CRIT_SECT_ENTER);
 }
 
 void nrf_802154_critical_section_exit(void)
@@ -230,6 +241,24 @@ void nrf_802154_critical_section_exit(void)
     nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_CRIT_SECT_EXIT);
 }
 
+void nrf_802154_critical_section_nesting_allow(void)
+{
+    assert(m_nested_critical_section_allowed_priority ==
+           NESTED_CRITICAL_SECTION_ALLOWED_PRIORITY_NONE);
+    assert(m_nested_critical_section_counter >= 1);
+
+    m_nested_critical_section_allowed_priority = active_priority_convert(
+        nrf_802154_critical_section_active_vector_priority_get());
+}
+
+void nrf_802154_critical_section_nesting_deny(void)
+{
+    assert(m_nested_critical_section_allowed_priority >= 0);
+    assert(m_nested_critical_section_counter >= 1);
+
+    m_nested_critical_section_allowed_priority = NESTED_CRITICAL_SECTION_ALLOWED_PRIORITY_NONE;
+}
+
 bool nrf_802154_critical_section_is_nested(void)
 {
     return m_nested_critical_section_counter > 1;
@@ -237,17 +266,20 @@ bool nrf_802154_critical_section_is_nested(void)
 
 uint32_t nrf_802154_critical_section_active_vector_priority_get(void)
 {
-    uint8_t active_vector_id = current_execution_context_get();
+    uint32_t  active_vector_id = (SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) >> SCB_ICSR_VECTACTIVE_Pos;
+    IRQn_Type irq_number;
+    uint32_t  active_priority;
 
+    // Check if this function is called from main thread.
     if (active_vector_id == 0)
     {
-        // This function is called from the main thread.
         return UINT32_MAX;
     }
-    else
-    {
-        // This function is called from an interrupt with the number below
-        assert(active_vector_id >= CMSIS_IRQ_NUM_VECTACTIVE_DIFF);
-        return NVIC_GetPriority((IRQn_Type)(active_vector_id - CMSIS_IRQ_NUM_VECTACTIVE_DIFF));
-    }
+
+    assert(active_vector_id >= CMSIS_IRQ_NUM_VECTACTIVE_DIFF);
+
+    irq_number      = (IRQn_Type)(active_vector_id - CMSIS_IRQ_NUM_VECTACTIVE_DIFF);
+    active_priority = NVIC_GetPriority(irq_number);
+
+    return active_priority;
 }
