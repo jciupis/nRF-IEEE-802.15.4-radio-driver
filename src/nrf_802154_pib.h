@@ -224,8 +224,11 @@ nrf_802154_coex_tx_request_mode_t nrf_802154_pib_coex_tx_request_mode_get(void);
  * @brief Sets the minimum value of the backoff exponent (BE) in the CSMA-CA algorithm.
  *
  * @param[in] min_be  Minimum value of the backoff exponent.
+ *
+ * @retval true   When value provided by @p min_be does not exceed the implementation limit ( <= 8).
+ * @retval false  Otherwise.
  */
-void nrf_802154_pib_csmaca_min_be_set(uint8_t min_be);
+bool nrf_802154_pib_csmaca_min_be_set(uint8_t min_be);
 
 /**
  * @brief Gets the minimum value of the backoff exponent (BE) in the CSMA-CA algorithm.
@@ -238,8 +241,11 @@ uint8_t nrf_802154_pib_csmaca_min_be_get(void);
  * @brief Sets the maximum value of the backoff exponent (BE) in the CSMA-CA algorithm.
  *
  * @param[in] max_be  Maximum value of the backoff exponent.
+ *
+ * @retval true   When value provided by @p max_be does not exceed the implementation limit ( <= 8).
+ * @retval false  Otherwise.
  */
-void nrf_802154_pib_csmaca_max_be_set(uint8_t max_be);
+bool nrf_802154_pib_csmaca_max_be_set(uint8_t max_be);
 
 /**
  * @brief Gets the maximum value of the backoff exponent (BE) in the CSMA-CA algorithm.

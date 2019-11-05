@@ -714,9 +714,9 @@ void nrf_802154_transmit_csma_ca(const uint8_t * p_data, uint8_t length)
 
 #endif // NRF_802154_USE_RAW_API
 
-void nrf_802154_csma_ca_min_be_set(uint8_t min_be)
+bool nrf_802154_csma_ca_min_be_set(uint8_t min_be)
 {
-    nrf_802154_pib_csmaca_min_be_set(min_be);
+    return nrf_802154_pib_csmaca_min_be_set(min_be);
 }
 
 uint8_t nrf_802154_csma_ca_min_be_get(void)
@@ -724,9 +724,9 @@ uint8_t nrf_802154_csma_ca_min_be_get(void)
     return nrf_802154_pib_csmaca_min_be_get();
 }
 
-void nrf_802154_csma_ca_max_be_set(uint8_t max_be)
+bool nrf_802154_csma_ca_max_be_set(uint8_t max_be)
 {
-    nrf_802154_pib_csmaca_max_be_set(max_be);
+    return nrf_802154_pib_csmaca_max_be_set(max_be);
 }
 
 uint8_t nrf_802154_csma_ca_max_be_get(void)

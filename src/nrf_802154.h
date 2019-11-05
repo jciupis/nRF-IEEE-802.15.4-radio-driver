@@ -1233,8 +1233,11 @@ void nrf_802154_transmit_csma_ca(const uint8_t * p_data, uint8_t length);
  * @brief Sets the minimum value of the backoff exponent (BE) in the CSMA-CA algorithm.
  *
  * @param[in] min_be  Minimum value of the backoff exponent.
+ *
+ * @retval true   When value provided by @p min_be has been set successfully.
+ * @retval false  Otherwise.
  */
-void nrf_802154_csma_ca_min_be_set(uint8_t min_be);
+bool nrf_802154_csma_ca_min_be_set(uint8_t min_be);
 
 /**
  * @brief Gets the minimum value of the backoff exponent (BE) in the CSMA-CA algorithm.
@@ -1247,8 +1250,11 @@ uint8_t nrf_802154_csma_ca_min_be_get(void);
  * @brief Sets the maximum value of the backoff exponent (BE) in the CSMA-CA algorithm.
  *
  * @param[in] max_be  Maximum value of the backoff exponent.
+ *
+ * @retval true   When value provided by @p max_be has been set successfully.
+ * @retval false  Otherwise.
  */
-void nrf_802154_csma_ca_max_be_set(uint8_t max_be);
+bool nrf_802154_csma_ca_max_be_set(uint8_t max_be);
 
 /**
  * @brief Gets the maximum value of the backoff exponent (BE) in the CSMA-CA algorithm.

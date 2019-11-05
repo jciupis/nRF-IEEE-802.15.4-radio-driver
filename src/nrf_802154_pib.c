@@ -46,6 +46,8 @@
 #include "nrf_802154_utils.h"
 #include "fal/nrf_802154_fal.h"
 
+#define CSMACA_BE_MAXIMUM 8 ///< The maximum allowed CSMA-CA backoff exponent (BE) that results from the implementation
+
 typedef struct
 {
     nrf_802154_coex_rx_request_mode_t rx_request_mode; ///< Coex request mode in receive operation.
@@ -370,9 +372,16 @@ nrf_802154_coex_tx_request_mode_t nrf_802154_pib_coex_tx_request_mode_get(void)
     return m_data.coex.tx_request_mode;
 }
 
-void nrf_802154_pib_csmaca_min_be_set(uint8_t min_be)
+bool nrf_802154_pib_csmaca_min_be_set(uint8_t min_be)
 {
-    m_data.csmaca.min_be = min_be;
+    bool result = (min_be <= CSMACA_BE_MAXIMUM);
+
+    if (result)
+    {
+        m_data.csmaca.min_be = min_be;
+    }
+
+    return result;
 }
 
 uint8_t nrf_802154_pib_csmaca_min_be_get(void)
@@ -380,9 +389,16 @@ uint8_t nrf_802154_pib_csmaca_min_be_get(void)
     return m_data.csmaca.min_be;
 }
 
-void nrf_802154_pib_csmaca_max_be_set(uint8_t max_be)
+bool nrf_802154_pib_csmaca_max_be_set(uint8_t max_be)
 {
-    m_data.csmaca.max_be = max_be;
+    bool result = (max_be <= CSMACA_BE_MAXIMUM);
+
+    if (result)
+    {
+        m_data.csmaca.max_be = max_be;
+    }
+
+    return result;
 }
 
 uint8_t nrf_802154_pib_csmaca_max_be_get(void)
