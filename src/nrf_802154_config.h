@@ -298,7 +298,13 @@ extern "C" {
  * The default minimum value of the backoff exponent (BE) in the CSMA-CA algorithm
  * (see IEEE 802.15.4-2015: 6.2.5.1).
  *
+ * @note The value of this parameter may be changed from default by calling
+ *       @ref nrf_802154_pib_csmaca_min_be_set function.
+ *
  */
+#ifdef NRF_802154_CSMA_CA_MIN_BE
+#error "NRF_802154_CSMA_CA_MIN_BE was replaced with NRF_802154_CSMA_CA_MIN_BE_DEFAULT"
+#endif
 #ifndef NRF_802154_CSMA_CA_MIN_BE_DEFAULT
 #define NRF_802154_CSMA_CA_MIN_BE_DEFAULT 3
 #endif
@@ -309,7 +315,13 @@ extern "C" {
  * The default maximum value of the backoff exponent, BE, in the CSMA-CA algorithm
  * (see IEEE 802.15.4-2015: 6.2.5.1).
  *
+ * @note The value of this parameter may be changed from default by calling
+ *       @ref nrf_802154_pib_csmaca_max_be_set function.
+ *
  */
+#ifdef NRF_802154_CSMA_CA_MAX_BE
+#error "NRF_802154_CSMA_CA_MAX_BE was replaced with NRF_802154_CSMA_CA_MAX_BE_DEFAULT"
+#endif
 #ifndef NRF_802154_CSMA_CA_MAX_BE_DEFAULT
 #define NRF_802154_CSMA_CA_MAX_BE_DEFAULT 5
 #endif
@@ -320,7 +332,14 @@ extern "C" {
  * The default maximum number of backoffs that the CSMA-CA algorithm will attempt before declaring
  * a channel access failure.
  *
+ * @note The value of this parameter may be changed from default by calling
+ *       @ref nrf_802154_pib_csmaca_max_backoffs_set function.
+ *
  */
+#ifdef NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS_DEFAULT
+#error \
+    "NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS was replaced with NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS_DEFAULT"
+#endif
 #ifndef NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS_DEFAULT
 #define NRF_802154_CSMA_CA_MAX_CSMA_BACKOFFS_DEFAULT 4
 #endif

@@ -60,17 +60,16 @@
     #define NRF_802154_CSMA_CA_ENABLED 1
 #endif
 
-#define TEST_FRAME_LENGTH 16
+#define CSMACA_MIN_BE_MINIMUM       0  ///< The minimum value of the backoff exponent (BE) allowed by the protocol specification
 
-#define CSMACA_MIN_BE_MINIMUM 0 ///< The minimum value of the backoff exponent (BE) allowed by the protocol specification
+#define CSMACA_MAX_BE_MINIMUM       3  ///< The minimum value of the maximum value of the backoff exponent (BE) allowed by the protocol specification
+#define CSMACA_MAX_BE_MAXIMUM       8  ///< The maximum value of the backoff exponent (BE) allowed by the protocol specification
 
-#define CSMACA_MAX_BE_MINIMUM 3 ///< The minimum value of the maximum value of the backoff exponent (BE) allowed by the protocol specification
-#define CSMACA_MAX_BE_MAXIMUM 8 ///< The maximum value of the backoff exponent (BE) allowed by the protocol specification
+#define CSMACA_MAX_BACKOFFS_MINIMUM 0  ///< The minimum value of the maximum number of CSMA-CA backoffs allowed by the protocol specification
+#define CSMACA_MAX_BACKOFFS_MAXIMUM 5  ///< The maximum number of the CSMA-CA backoffs allowed by the protocol specification
 
-#define CSMACA_MAX_BACKOFFS_MINIMUM 0 ///< The minimum value of the maximum number of CSMA-CA backoffs allowed by the protocol specification
-#define CSMACA_MAX_BACKOFFS_MAXIMUM 5 ///< The maximum number of the CSMA-CA backoffs allowed by the protocol specification
-
-#define COEX_TX_REQUEST_MODE_NUM 4
+#define TEST_FRAME_LENGTH           16 ///< Length of the test frame in bytes.
+#define COEX_TX_REQUEST_MODE_NUM    4  ///< Number of Coex TX request modes
 
 static const uint8_t mp_test_data[TEST_FRAME_LENGTH] =
 {
@@ -140,9 +139,9 @@ static void mock_random_backoff_start(void)
     nrf_802154_rsch_delayed_timeslot_request_IgnoreAndReturn(true);
 }
 
-static void mock_failed_and_rescheduled_backoffs(uint8_t failed_backoffs)
+static void mock_busy_and_rescheduled_backoffs(uint8_t cca_busy_backoffs)
 {
-    for (uint8_t backoffs = 0; backoffs < failed_backoffs; backoffs++)
+    for (uint8_t backoffs = 0; backoffs < cca_busy_backoffs; backoffs++)
     {
         nrf_802154_pib_csmaca_max_be_get_ExpectAndReturn(m_test_params.max_be);
         nrf_802154_pib_csmaca_max_backoffs_get_ExpectAndReturn(m_test_params.max_backoffs);
@@ -198,15 +197,15 @@ static void verify_csma_ca_failed(void)
     TEST_ASSERT_FALSE(m_is_running);
 }
 
-static void verify_csma_ca_succeeded(uint8_t failed_backoffs)
+static void verify_csma_ca_succeeded(uint8_t cca_busy_backoffs)
 {
-    if (0 == failed_backoffs)
+    if (0 == cca_busy_backoffs)
     {
         TEST_ASSERT_EQUAL_UINT8(m_be, m_test_params.min_be);
     }
 
     TEST_ASSERT_TRUE((m_be >= m_test_params.min_be) && (m_be <= m_test_params.max_be));
-    TEST_ASSERT_EQUAL_UINT8(m_nb, failed_backoffs);
+    TEST_ASSERT_EQUAL_UINT8(m_nb, cca_busy_backoffs);
     TEST_ASSERT_FALSE(m_is_running);
 }
 
@@ -227,7 +226,7 @@ static void verify_channel_busy_scenario(uint8_t min_be, uint8_t max_be)
             if (max_backoffs > 1)
             {
                 // Mock failed attempts followed by a reschedule
-                mock_failed_and_rescheduled_backoffs(max_backoffs - 1);
+                mock_busy_and_rescheduled_backoffs(max_backoffs - 1);
             }
 
             // Mock that the last backoff failed and stop the procedure
@@ -248,7 +247,7 @@ static void verify_channel_empty_scenario(uint8_t min_be, uint8_t max_be)
     {
         for (uint8_t max_backoffs = CSMACA_MAX_BACKOFFS_MINIMUM; max_backoffs <= CSMACA_MAX_BACKOFFS_MAXIMUM; max_backoffs++)
         {
-            uint8_t failed_backoffs = 0;
+            uint8_t cca_busy_backoffs = 0;
 
             do
             {
@@ -259,24 +258,24 @@ static void verify_channel_empty_scenario(uint8_t min_be, uint8_t max_be)
                 mock_csma_ca_start();
 
                 // The number of failed backoffs must be non-zero to perform more than the last backoff
-                if (failed_backoffs > 0)
+                if (cca_busy_backoffs > 0)
                 {
                     // Mock failed attempts followed by a reschedule
-                    mock_failed_and_rescheduled_backoffs(failed_backoffs);
+                    mock_busy_and_rescheduled_backoffs(cca_busy_backoffs);
                 }
 
                 // Mock that the next attempt was successful
                 mock_successful_backoff();
 
                 // Verify that the procedure was ended gracefully
-                verify_csma_ca_succeeded(failed_backoffs);
+                verify_csma_ca_succeeded(cca_busy_backoffs);
 
                 // Having verified all conditions so far, start over clean to avoid excessive memory consumption.
                 resetTest();
 
-                failed_backoffs++;
+                cca_busy_backoffs++;
 
-            } while (failed_backoffs < max_backoffs);
+            } while (cca_busy_backoffs < max_backoffs);
         }
     }
 }

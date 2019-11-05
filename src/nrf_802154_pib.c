@@ -46,14 +46,6 @@
 #include "nrf_802154_utils.h"
 #include "fal/nrf_802154_fal.h"
 
-#define CSMACA_MIN_BE_MINIMUM       0 ///< The minimum value of the backoff exponent (BE) allowed by the protocol specification
-
-#define CSMACA_MAX_BE_MINIMUM       3 ///< The minimum value of the maximum value of the backoff exponent (BE) allowed by the protocol specification
-#define CSMACA_MAX_BE_MAXIMUM       8 ///< The maximum value of the backoff exponent (BE) allowed by the protocol specification
-
-#define CSMACA_MAX_BACKOFFS_MINIMUM 0 ///< The minimum value of the maximum number of CSMA-CA backoffs allowed by the protocol specification
-#define CSMACA_MAX_BACKOFFS_MAXIMUM 5 ///< The maximum number of the CSMA-CA backoffs allowed by the protocol specification
-
 typedef struct
 {
     nrf_802154_coex_rx_request_mode_t rx_request_mode; ///< Coex request mode in receive operation.
@@ -141,11 +133,6 @@ static nrf_radio_txpower_t to_radio_tx_power_convert(int8_t integer_tx_power)
     }
 
     return radio_tx_power;
-}
-
-static bool in_range(uint8_t value, uint8_t min, uint8_t max)
-{
-    return ((value >= min) && (value <= max));
 }
 
 /**
@@ -383,16 +370,9 @@ nrf_802154_coex_tx_request_mode_t nrf_802154_pib_coex_tx_request_mode_get(void)
     return m_data.coex.tx_request_mode;
 }
 
-bool nrf_802154_pib_csmaca_min_be_set(uint8_t min_be)
+void nrf_802154_pib_csmaca_min_be_set(uint8_t min_be)
 {
-    bool result = in_range(min_be, CSMACA_MIN_BE_MINIMUM, m_data.csmaca.max_be);
-
-    if (result)
-    {
-        m_data.csmaca.min_be = min_be;
-    }
-
-    return result;
+    m_data.csmaca.min_be = min_be;
 }
 
 uint8_t nrf_802154_pib_csmaca_min_be_get(void)
@@ -400,16 +380,9 @@ uint8_t nrf_802154_pib_csmaca_min_be_get(void)
     return m_data.csmaca.min_be;
 }
 
-bool nrf_802154_pib_csmaca_max_be_set(uint8_t max_be)
+void nrf_802154_pib_csmaca_max_be_set(uint8_t max_be)
 {
-    bool result = in_range(max_be, CSMACA_MAX_BE_MINIMUM, CSMACA_MAX_BE_MAXIMUM);
-
-    if (result)
-    {
-        m_data.csmaca.max_be = max_be;
-    }
-
-    return result;
+    m_data.csmaca.max_be = max_be;
 }
 
 uint8_t nrf_802154_pib_csmaca_max_be_get(void)
@@ -417,16 +390,9 @@ uint8_t nrf_802154_pib_csmaca_max_be_get(void)
     return m_data.csmaca.max_be;
 }
 
-bool nrf_802154_pib_csmaca_max_backoffs_set(uint8_t max_backoffs)
+void nrf_802154_pib_csmaca_max_backoffs_set(uint8_t max_backoffs)
 {
-    bool result = in_range(max_backoffs, CSMACA_MAX_BACKOFFS_MINIMUM, CSMACA_MAX_BACKOFFS_MAXIMUM);
-
-    if (result)
-    {
-        m_data.csmaca.max_backoffs = max_backoffs;
-    }
-
-    return result;
+    m_data.csmaca.max_backoffs = max_backoffs;
 }
 
 uint8_t nrf_802154_pib_csmaca_max_backoffs_get(void)
