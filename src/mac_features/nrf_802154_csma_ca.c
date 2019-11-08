@@ -93,6 +93,23 @@ static void procedure_stop(void)
     m_is_running = false;
 }
 
+static void priority_leverage(void)
+{
+    bool first_transmit_attempt     = (0 == m_nb);
+    bool coex_requires_boosted_prio = (nrf_802154_pib_coex_tx_request_mode_get() ==
+                                       NRF_802154_COEX_TX_REQUEST_MODE_CCA_START);
+
+    // Leverage priority only after the first backoff in the specified Coex TX request mode
+    if (first_transmit_attempt && coex_requires_boosted_prio)
+    {
+        // It should always be possible to update this timeslot's priority here
+        if (!nrf_802154_rsch_delayed_timeslot_priority_update(RSCH_DLY_CSMACA, RSCH_PRIO_TX))
+        {
+            assert(false);
+        }
+    }
+}
+
 /**
  * @brief Notify MAC layer that channel is busy if tx request failed and there are no retries left.
  *
@@ -123,6 +140,8 @@ static void frame_transmit(rsch_dly_ts_id_t dly_ts_id)
 
     if (procedure_is_running())
     {
+        priority_leverage();
+
         if (!nrf_802154_request_transmit(NRF_802154_TERM_NONE,
                                          REQ_ORIG_CSMA_CA,
                                          mp_data,
@@ -156,16 +175,31 @@ static void random_backoff_start(void)
     {
         .t0               = nrf_802154_timer_sched_time_get(),
         .dt               = backoff_periods * UNIT_BACKOFF_PERIOD,
-        .prio             = RSCH_PRIO_IDLE_LISTENING,
         .id               = RSCH_DLY_CSMACA,
         .type             = RSCH_DLY_TS_TYPE_RELAXED,
         .started_callback = frame_transmit,
     };
 
-    // If Coex precondition should be requested immediately, preconditions priority must be leveraged
-    if (nrf_802154_pib_coex_tx_request_mode_get() == NRF_802154_COEX_TX_REQUEST_MODE_FRAME_READY)
+    switch (nrf_802154_pib_coex_tx_request_mode_get())
     {
-        backoff_ts_param.prio = RSCH_PRIO_TX;
+        case NRF_802154_COEX_TX_REQUEST_MODE_FRAME_READY:
+            // To request Coex precondition immediately, priority must be leveraged
+            backoff_ts_param.prio = RSCH_PRIO_TX;
+            break;
+
+        case NRF_802154_COEX_TX_REQUEST_MODE_CCA_START:
+            // Coex should be requested for all backoff periods but the first one
+            backoff_ts_param.prio = (m_nb == 0) ? RSCH_PRIO_IDLE_LISTENING : RSCH_PRIO_TX;
+            break;
+
+        case NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE:
+            // Coex should not be requested during backoff periods
+            backoff_ts_param.prio = RSCH_PRIO_IDLE_LISTENING;
+            break;
+
+        default:
+            assert(false);
+            break;
     }
 
     // Delayed timeslot with these parameters should always be scheduled

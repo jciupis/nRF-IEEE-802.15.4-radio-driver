@@ -219,6 +219,18 @@ bool nrf_802154_rsch_delayed_timeslot_request(const rsch_dly_ts_param_t * p_dly_
 bool nrf_802154_rsch_delayed_timeslot_cancel(rsch_dly_ts_id_t dly_ts_id);
 
 /**
+ * @brief Updates priority of a requested delayed timeslot.
+ *
+ * @param[in] dly_ts_id    ID of the requested timeslot.
+ * @param[in] dly_ts_prio  Priority to be assigned to the requested timeslot.
+ *
+ * @retval true     Scheduled timeslot's priority has been updated.
+ * @retval false    Priority of the specified timeslot could not be updated.
+ */
+bool nrf_802154_rsch_delayed_timeslot_priority_update(rsch_dly_ts_id_t dly_ts_id,
+                                                      rsch_prio_t      dly_ts_prio);
+
+/**
  * @brief Checks if there is a pending timeslot request.
  *
  * @note The delayed timeslot is considered requested once its preconditions are requested

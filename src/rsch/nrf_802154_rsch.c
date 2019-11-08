@@ -581,6 +581,25 @@ bool nrf_802154_rsch_delayed_timeslot_cancel(rsch_dly_ts_id_t dly_ts_id)
     return result;
 }
 
+bool nrf_802154_rsch_delayed_timeslot_priority_update(rsch_dly_ts_id_t dly_ts_id,
+                                                      rsch_prio_t      dly_ts_prio)
+{
+    assert(dly_ts_id < RSCH_DLY_TS_NUM);
+
+    dly_ts_t * p_dly_ts = &m_dly_ts[dly_ts_id];
+
+    // Do not modify inactive timeslot
+    if (p_dly_ts->param.prio == RSCH_PRIO_IDLE)
+    {
+        return false;
+    }
+    else
+    {
+        p_dly_ts->param.prio = dly_ts_prio;
+        return true;
+    }
+}
+
 bool nrf_802154_rsch_timeslot_is_requested(void)
 {
     bool result = false;
