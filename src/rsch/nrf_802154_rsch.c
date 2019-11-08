@@ -237,9 +237,12 @@ static inline void all_prec_update(void)
             {
                 // Intentionally empty
             }
-
-            nrf_802154_wifi_coex_prio_request(new_prio);
         }
+
+        // It might happen that Coex withdrew its approval for the Coex precondition in the middle
+        // of a compound operation such as CSMA/CA, so the driver core did not notice it.
+        // The precondition has to be re-requested irrespectively of the previous requests then.
+        nrf_802154_wifi_coex_prio_request(new_prio);
 
         mutex_unlock(&m_req_mutex);
     }
