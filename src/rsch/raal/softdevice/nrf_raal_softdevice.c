@@ -124,6 +124,7 @@ _Pragma("GCC diagnostic pop")
 typedef enum
 {
     TIMESLOT_STATE_IDLE = 0,
+    TIMESLOT_STATE_DROPPED,
     TIMESLOT_STATE_REQUESTED,
     TIMESLOT_STATE_GRANTED
 } timeslot_state_t;
@@ -333,6 +334,11 @@ static inline bool timeslot_is_idle(void)
 static inline bool timeslot_is_granted(void)
 {
     return (m_timeslot_state == TIMESLOT_STATE_GRANTED);
+}
+
+static inline bool timeslot_is_being_dropped(void)
+{
+    return (m_timeslot_state == TIMESLOT_STATE_DROPPED);
 }
 
 /**@brief Notify driver that timeslot has been started. */
@@ -605,8 +611,11 @@ static nrf_radio_signal_callback_return_param_t * signal_handler(uint8_t signal_
 
             if (!timeslot_is_granted())
             {
-                m_timeslot_state = TIMESLOT_STATE_GRANTED;
-                timeslot_started_notify();
+                if (!timeslot_is_being_dropped())
+                {
+                    m_timeslot_state = TIMESLOT_STATE_GRANTED;
+                    timeslot_started_notify();
+                }
             }
 
             nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_RAAL_SIG_EVENT_EXTEND_SUCCESS);
@@ -785,14 +794,12 @@ void nrf_raal_continuous_mode_exit(void)
         // the timer
         timer_reset();
 
-        m_continuous = false;
+        // Be cautious - most likely this is not an interrupt context
+        // Clearing this flag might cause incoming radio interrupt to drop timeslot prematurely
+        m_timeslot_state = TIMESLOT_STATE_DROPPED;
         __DMB();
 
         nrf_raal_timeslot_ended();
-
-        // Emulate signal interrupt to inform SD about end of continuous mode.
-        NVIC_SetPendingIRQ(RADIO_IRQn);
-        NVIC_EnableIRQ(RADIO_IRQn);
     }
     else
     {
@@ -804,7 +811,20 @@ void nrf_raal_continuous_mode_exit(void)
 
 void nrf_raal_continuous_ended(void)
 {
-    // Intentionally empty.
+    // Timeslot was dropped intentionally
+    if (timeslot_is_being_dropped())
+    {
+        m_continuous = false;
+        __DMB();
+
+        // Emulate signal interrupt to inform SD about end of continuous mode.
+        NVIC_SetPendingIRQ(RADIO_IRQn);
+        NVIC_EnableIRQ(RADIO_IRQn);
+    }
+    else
+    {
+        // Intentionally empty
+    }
 }
 
 bool nrf_raal_timeslot_request(uint32_t length_us)

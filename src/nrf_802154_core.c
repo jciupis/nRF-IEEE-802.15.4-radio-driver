@@ -712,20 +712,12 @@ static bool current_operation_terminate(nrf_802154_term_t term_lvl,
 /** Enter Sleep state. */
 static void sleep_init(void)
 {
-    nrf_802154_trx_disable();
     nrf_802154_timer_coord_stop();
 }
 
 /** Initialize Falling Asleep operation. */
 static void falling_asleep_init(void)
 {
-    if (!timeslot_is_granted())
-    {
-        sleep_init();
-        state_set(RADIO_STATE_SLEEP);
-        return;
-    }
-
     if (nrf_802154_trx_go_idle())
     {
         // There will be nrf_802154_trx_in_idle call, where we will continue processing
@@ -951,6 +943,8 @@ static void on_timeslot_ended(void)
 
         nrf_802154_timer_coord_stop();
 
+        nrf_802154_rsch_continuous_ended();
+
         result = nrf_802154_core_hooks_terminate(NRF_802154_TERM_802154, REQ_ORIG_RSCH);
         assert(result);
         (void)result;
@@ -1106,9 +1100,9 @@ void nrf_802154_rsch_crit_sect_prio_changed(rsch_prio_t prio)
 
     m_rsch_priority = prio;
 
+    // We have just got a timeslot.
     if ((old_prio == RSCH_PRIO_IDLE) && (prio != RSCH_PRIO_IDLE))
     {
-        // We have just got a timeslot.
         nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_TIMESLOT_STARTED);
 
         nrf_802154_trx_enable();
@@ -1119,11 +1113,20 @@ void nrf_802154_rsch_crit_sect_prio_changed(rsch_prio_t prio)
 
         nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_TIMESLOT_STARTED);
     }
+    // We are giving back timeslot.
     else if ((old_prio != RSCH_PRIO_IDLE) && (prio == RSCH_PRIO_IDLE))
     {
-        // We are giving back timeslot.
         on_timeslot_ended();
         return;
+    }
+    // TODO: how to motivate adding this else-if?
+    else if (prio == RSCH_PRIO_IDLE)
+    {
+        nrf_802154_rsch_continuous_ended();
+    }
+    else
+    {
+        // Intentionally empty
     }
 
     int_fast8_t transition = action_needed(old_prio, prio, m_state);
@@ -1748,8 +1751,16 @@ bool nrf_802154_core_sleep(nrf_802154_term_t term_lvl)
 
             if (result)
             {
-                state_set(RADIO_STATE_FALLING_ASLEEP);
-                falling_asleep_init();
+                if (!timeslot_is_granted())
+                {
+                    sleep_init();
+                    state_set(RADIO_STATE_SLEEP);
+                }
+                else
+                {
+                    state_set(RADIO_STATE_FALLING_ASLEEP);
+                    falling_asleep_init();
+                }
             }
         }
 
