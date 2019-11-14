@@ -1891,9 +1891,10 @@ bool nrf_802154_core_energy_detection(nrf_802154_term_t term_lvl, uint32_t time_
                 time_us = ED_ITER_DURATION;
             }
 
-            state_set(RADIO_STATE_ED);
             m_ed_time_left = time_us;
             m_ed_result    = 0;
+
+            state_set(RADIO_STATE_ED);
             ed_init(true);
         }
 
