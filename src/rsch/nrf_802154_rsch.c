@@ -287,19 +287,23 @@ static inline bool requested_prio_lvl_is_at_least(rsch_prio_t prio)
 }
 
 /** @brief Notify core if preconditions are approved or denied if current state differs from last reported.
+ *
+ * @retval true   Core was notified.
+ * @retval false  Otherwise.
  */
-static inline void notify_core(void)
+static inline bool notify_core(void)
 {
     nrf_802154_log_entry(notify_core, 2);
 
     rsch_prio_t approved_prio_lvl;
     uint8_t     temp_mon;
+    bool        notified = false;
 
     do
     {
         if (!mutex_trylock(&m_ntf_mutex, &m_ntf_mutex_monitor))
         {
-            return;
+            break;
         }
 
         /* It is possible that preemption is not detected (m_ntf_mutex_monitor is read after
@@ -315,6 +319,8 @@ static inline void notify_core(void)
             m_last_notified_prio = approved_prio_lvl;
 
             nrf_802154_rsch_continuous_prio_changed(approved_prio_lvl);
+
+            notified = true;
         }
 
         mutex_unlock(&m_ntf_mutex);
@@ -322,6 +328,8 @@ static inline void notify_core(void)
     while (temp_mon != m_ntf_mutex_monitor);
 
     nrf_802154_log_exit(notify_core, 2);
+
+    return notified;
 }
 
 /** Timer callback used to trigger delayed timeslot.
@@ -647,7 +655,12 @@ void nrf_raal_timeslot_ended(void)
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_RSCH_TIMESLOT_ENDED);
 
     prec_approved_prio_set(RSCH_PREC_RAAL, RSCH_PRIO_IDLE);
-    notify_core();
+
+    // Ensure that RAAL can finish its processing even if core is not informed about it.
+    if (!notify_core())
+    {
+        nrf_802154_rsch_continuous_ended();
+    }
 
     nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_RSCH_TIMESLOT_ENDED);
 }
