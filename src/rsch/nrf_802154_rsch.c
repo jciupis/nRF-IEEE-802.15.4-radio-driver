@@ -558,9 +558,12 @@ bool nrf_802154_rsch_delayed_timeslot_cancel(rsch_dly_ts_id_t dly_ts_id)
 
     nrf_802154_timer_sched_remove(&p_dly_ts->timer, &was_running);
 
-    p_dly_ts->param.prio = RSCH_PRIO_IDLE;
-    all_prec_update();
-    notify_core();
+    if (p_dly_ts->param.prio != RSCH_PRIO_IDLE)
+    {
+        p_dly_ts->param.prio = RSCH_PRIO_IDLE;
+        all_prec_update();
+        notify_core();
+    }
 
     switch (p_dly_ts->param.type)
     {
