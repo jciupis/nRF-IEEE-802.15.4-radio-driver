@@ -1119,7 +1119,10 @@ void nrf_802154_rsch_crit_sect_prio_changed(rsch_prio_t prio)
         on_timeslot_ended();
         return;
     }
-    // TODO: how to motivate adding this else-if?
+    // It might happen that even though IDLE has already been notified, this function is called
+    // again as a result of preemptions caused by unexpected timeslot change (e.g. the application
+    // requested transition to sleep while out of timeslot and RAAL notified timeslot start
+    // in the middle of that sleep request). The following block makes RAAL finish its processing.
     else if (prio == RSCH_PRIO_IDLE)
     {
         nrf_802154_rsch_continuous_ended();
