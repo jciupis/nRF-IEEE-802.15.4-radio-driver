@@ -111,13 +111,16 @@ static bool nested_critical_section_is_allowed_in_this_context(void)
 
 static bool critical_section_enter(bool forced)
 {
-    bool    result = false;
-    uint8_t cnt;
+    bool     result = false;
+    uint8_t  cnt;
+    uint32_t interrupt_state = __get_PRIMASK();
 
     if (forced ||
         (m_nested_critical_section_counter == 0) ||
         nested_critical_section_is_allowed_in_this_context())
     {
+        __disable_irq();
+
         do
         {
             cnt = __LDREXB(&m_nested_critical_section_counter);
@@ -131,6 +134,8 @@ static bool critical_section_enter(bool forced)
         radio_critical_section_enter();
         __DSB();
         __ISB();
+
+        __set_PRIMASK(interrupt_state);
 
         m_critical_section_monitor++;
 
