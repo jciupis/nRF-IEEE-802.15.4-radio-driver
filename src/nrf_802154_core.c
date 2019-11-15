@@ -1100,9 +1100,9 @@ void nrf_802154_rsch_crit_sect_prio_changed(rsch_prio_t prio)
 
     m_rsch_priority = prio;
 
-    // We have just got a timeslot.
     if ((old_prio == RSCH_PRIO_IDLE) && (prio != RSCH_PRIO_IDLE))
     {
+        // We have just got a timeslot.
         nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_TIMESLOT_STARTED);
 
         nrf_802154_trx_enable();
@@ -1113,18 +1113,18 @@ void nrf_802154_rsch_crit_sect_prio_changed(rsch_prio_t prio)
 
         nrf_802154_log(EVENT_TRACE_EXIT, FUNCTION_TIMESLOT_STARTED);
     }
-    // We are giving back timeslot.
     else if ((old_prio != RSCH_PRIO_IDLE) && (prio == RSCH_PRIO_IDLE))
     {
+        // We are giving back timeslot.
         on_timeslot_ended();
         return;
     }
-    // It might happen that even though IDLE has already been notified, this function is called
-    // again as a result of preemptions caused by unexpected timeslot change (e.g. the application
-    // requested transition to sleep while out of timeslot and RAAL notified timeslot start
-    // in the middle of that sleep request). The following block makes RAAL finish its processing.
     else if (prio == RSCH_PRIO_IDLE)
     {
+        // It might happen that even though IDLE has already been notified, this function is called
+        // again as a result of preemptions caused by unexpected timeslot change (e.g. the application
+        // requested transition to sleep while out of timeslot and RAAL notified timeslot start
+        // in the middle of that sleep request). The following block makes RAAL finish its processing.
         nrf_802154_rsch_continuous_ended();
     }
     else
@@ -1754,15 +1754,16 @@ bool nrf_802154_core_sleep(nrf_802154_term_t term_lvl)
 
             if (result)
             {
-                if (!timeslot_is_granted())
-                {
-                    sleep_init();
-                    state_set(RADIO_STATE_SLEEP);
-                }
-                else
+                // The order of calls in the following blocks is inverted to avoid RAAL races.
+                if (timeslot_is_granted())
                 {
                     state_set(RADIO_STATE_FALLING_ASLEEP);
                     falling_asleep_init();
+                }
+                else
+                {
+                    sleep_init();
+                    state_set(RADIO_STATE_SLEEP);
                 }
             }
         }

@@ -173,7 +173,8 @@ static timer_action_t m_timer_action;
 static uint16_t m_timeslot_length;
 
 /**@brief Previously granted timeslot length.
- *        The RAAL timer uses this value to fire by the end of the previously granted timeslot
+ *
+ * @note  The RAAL timer uses this value to fire by the end of the previously granted timeslot
  *        to attempt timeslot extension. After successful extension, the value is updated.
  */
 static uint16_t m_prev_timeslot_length;
@@ -469,16 +470,15 @@ static void extension_margin_exceeded_handle(void)
     bool     has_remaining_timeslot =
         m_config.sd_cfg.timeslot_max_length > (elapsed_timeslot + m_config.sd_cfg.timeslot_length);
 
-    // There still is some remaining timeslot that can be utilized
+    // Check if there's any point in trying to extend the timeslot
     if (m_continuous && has_remaining_timeslot)
     {
-        // Try to extend timeslot
+        // There still is some remaining timeslot that can be utilized. Try to extend it
         timeslot_extend(m_config.sd_cfg.timeslot_length);
     }
-    // Maximum timeslot length has been reached
     else
     {
-        // Set timer for safety margin
+        // Maximum timeslot length has been reached. Set timer for safety margin
         timer_to_margin_set();
 
         m_ret_param.callback_action = NRF_RADIO_SIGNAL_CALLBACK_ACTION_NONE;
@@ -490,26 +490,27 @@ static void extension_margin_exceeded_handle(void)
 /**@brief Handle timer interrupts. */
 static void timer_irq_handle(void)
 {
-    // Margin or extend event triggered.
+    // Check that margin or extend event triggered.
     if (nrf_timer_event_check(RAAL_TIMER, TIMER_CC_ACTION_EVENT))
     {
-        // Timer has already been set to the safety margin
+        // Check if it was safety or extension margin that triggered the interrupt
         if (timer_is_set_to_margin())
         {
-            // Timer has reached the safety margin
+            // Timer has already been set to the safety margin. Check if it was reached
             if (timer_is_margin_reached())
             {
+                // Timer has reached the safety margin. Handle it
                 safety_margin_exceeded_handle();
             }
-            // Timer has not reached the safety margin yet
             else
             {
+                // Timer has not reached the safety margin yet. Take the opportunity to correct it
                 safety_margin_drift_correct();
             }
         }
-        // Timer has not been set to the safety margin yet. The extension margin was exceeded
         else
         {
+            // Timer has not been set to the safety margin yet. The extension margin was exceeded
             extension_margin_exceeded_handle();
         }
     }
@@ -582,24 +583,25 @@ static void radio_irq_handle(void)
 {
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_RAAL_SIG_EVENT_RADIO);
 
-    // Timeslot is granted, so we are willing to process this interrupt
+    // Verify if the interrupt should be processed at all
     if (timeslot_state_is(TIMESLOT_STATE_GRANTED))
     {
-        // The safety margin has not been reached yet. The interrupt can be processed safely
+        // We are willing to process this interrupt. Check if it can be done now
         if (!timer_is_margin_reached())
         {
+            // The safety margin has not been reached yet. The interrupt can be processed safely
             nrf_802154_radio_irq_handler();
         }
-        // The safety margin has been reached and the timer interrupt cannot be delayed any longer.
-        // The margin must be handled immediately and the radio interrupt should be dropped
         else
         {
+            // The safety margin has been reached and the timer interrupt cannot be delayed any longer.
+            // The margin must be handled immediately and the radio interrupt should be dropped
             timer_irq_handle();
         }
     }
-    // Timeslot is being dropped or revoked. This interrupt is obsolete
     else
     {
+        // Timeslot is being dropped or revoked. This interrupt is obsolete
         unwanted_radio_irq_handle();
     }
 
@@ -611,9 +613,9 @@ static void timeslot_extend_failed_handle(void)
 {
     nrf_802154_log(EVENT_TRACE_ENTER, FUNCTION_RAAL_SIG_EVENT_EXTEND_FAIL);
 
-    // The timeslot is going to be revoked soon and we've just found out about it
     if (!timer_is_set_to_margin())
     {
+        // The timeslot is going to be revoked soon and we've just found out about it
         timer_to_margin_set();
     }
 
@@ -631,18 +633,18 @@ static void timeslot_extend_succeeded_handle(void)
     bool timeslot_can_be_extended = (ticks_to_timeslot_end_get() >=
                                      MINIMUM_TIMESLOT_LENGTH_EXTENSION_TIME_TICKS);
 
-    // Timer is not set to margin yet, but there is not enough time for even the shortest extension
+    // Verify that another timeslot extension can be attempted safely
     if (!timer_is_set_to_margin() && (!timeslot_can_be_extended))
     {
-        // Do not attempt extension, set timer for safety margin immediately
+        // Timer is not set to margin yet, but there is not enough time for even the shortest
+        // extension. Do not attempt extension, set timer for safety margin immediately instead
         timer_to_margin_set();
 
         m_ret_param.callback_action = NRF_RADIO_SIGNAL_CALLBACK_ACTION_NONE;
     }
-    // Extension can be attempted safely
     else
     {
-        // Set timer for the next extension
+        // Extension can be attempted safely. Set timer for the next extension
         timer_on_extend_update();
 
         // Update the value for which the next extension timer should be set
@@ -655,9 +657,9 @@ static void timeslot_extend_succeeded_handle(void)
         }
     }
 
-    // Timeslot has been started and extended successfully. Notify the higher layer
     if (timeslot_state_is(TIMESLOT_STATE_REQUESTED))
     {
+        // Timeslot has been started and extended successfully. Notify the higher layer
         m_timeslot_state = TIMESLOT_STATE_GRANTED;
         timeslot_started_notify();
     }
@@ -676,11 +678,6 @@ static void timeslot_busy_handle(void)
 
     if (m_continuous)
     {
-        if (m_timeslot_extend_tries < m_config.sd_cfg.timeslot_alloc_iters)
-        {
-            timeslot_length_decrease();
-        }
-
         timeslot_request();
     }
 
@@ -905,9 +902,22 @@ void nrf_raal_continuous_mode_exit(void)
 
 void nrf_raal_continuous_ended(void)
 {
-    // Timeslot was dropped intentionally
+    // This function should only be called at the end of a sequence of passing over the timeslot.
+    // In the current implementation, the sequence might occur either due to the timeslot being
+    // revoked by the Radio arbiter, in which case the timeslot is already IDLE when this function
+    // is called, or as a result of a higher layer request to intentionally drop the timeslot,
+    // which would make the timeslot DROPPED at the moment of this function's execution.
+
+    // However, the timeslot state is not asserted here. It might happen that a precondition other
+    // than RAAL revokes access to the RADIO peripheral, which would result in core being notified
+    // about approved preconditions priority equal IDLE. In that case, this function could be called
+    // with the timeslot being in some other state and it should not be considered an error.
+    // It is not possible in the exising implementation, but the design allows it, so the timeslot
+    // state should not be asserted here.
+
     if (timeslot_state_is(TIMESLOT_STATE_DROPPED))
     {
+        // Timeslot was dropped intentionally
         m_continuous = false;
         __DMB();
 
@@ -917,7 +927,7 @@ void nrf_raal_continuous_ended(void)
     }
     else
     {
-        // Intentionally empty
+        // Nothing to do here. Drop the notification
     }
 }
 

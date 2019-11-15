@@ -398,9 +398,10 @@ static bool precise_delayed_timeslot_request(dly_ts_t                  * p_dly_t
     uint32_t now    = nrf_802154_timer_sched_time_get();
     uint32_t req_dt = p_param->dt - PREC_RAMP_UP_TIME;
 
-    // There is enough time for preconditions ramp-up no matter their current state.
     if (nrf_802154_timer_sched_time_is_in_future(now, p_param->t0, req_dt))
     {
+        // There is enough time for preconditions ramp-up no matter their current state.
+
         p_dly_ts->param = *p_param;
 
         p_dly_ts->timer.t0        = p_param->t0;
@@ -412,11 +413,12 @@ static bool precise_delayed_timeslot_request(dly_ts_t                  * p_dly_t
 
         return true;
     }
-    // There is not enough time to perform full precondition ramp-up.
-    // Try with the currently approved preconditions
     else if (requested_prio_lvl_is_at_least(RSCH_PRIO_IDLE_LISTENING) &&
              nrf_802154_timer_sched_time_is_in_future(now, p_param->t0, p_param->dt))
     {
+        // There is not enough time to perform full precondition ramp-up.
+        // Try with the currently approved preconditions
+
         p_dly_ts->param = *p_param;
 
         p_dly_ts->timer.t0        = p_param->t0;
@@ -429,9 +431,9 @@ static bool precise_delayed_timeslot_request(dly_ts_t                  * p_dly_t
 
         return true;
     }
-    // The requested time is in the past.
     else
     {
+        // The requested time is in the past.
         return false;
     }
 }
