@@ -2175,6 +2175,8 @@ static void txack_finish(void)
      * stopped now, and there is no PPIs starting it automatically by the hardware.
      */
     nrf_ppi_channel_disable(PPI_TIMER_TX_ACK);
+    nrf_ppi_channel_endpoint_setup(PPI_TIMER_TX_ACK, 0, 0);
+    nrf_ppi_fork_endpoint_setup(PPI_TIMER_TX_ACK, 0);
 
     nrf_radio_shorts_set(SHORTS_IDLE);
 
