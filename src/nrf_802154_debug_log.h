@@ -73,23 +73,17 @@
 #define NRF_802154_LOG_VERBOSITY_HIGH 2
 
 #if (NRF_802154_DEBUG_LOG_BLOCKS_INTERRUPTS)
+
+#include "nrf_802154_utils.h"
+
 #define nrf_802154_debug_log_saved_interrupt_state_variable(var_name) \
-    uint32_t var_name
+    nrf_802154_mcu_critical_state_t var_name
 
 #define nrf_802154_debug_log_disable_interrupts(var_name) \
-    do                                                    \
-    {                                                     \
-        (var_name) = __get_PRIMASK();                     \
-        __disable_irq();                                  \
-    }                                                     \
-    while (0)
+    nrf_802154_mcu_critical_enter(var_name)               \
 
 #define nrf_802154_debug_log_restore_interrupts(var_name) \
-    do                                                    \
-    {                                                     \
-        __set_PRIMASK(var_name);                          \
-    }                                                     \
-    while (0)
+    nrf_802154_mcu_critical_exit(var_name)                \
 
 #else
 

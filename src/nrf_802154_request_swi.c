@@ -177,6 +177,9 @@ static nrf_802154_queue_t m_requests_queue;
 /**@brief Memory holding requests queue items */
 static nrf_802154_req_data_t m_requests_queue_memory[REQ_QUEUE_SIZE];
 
+/**@brief State of the MCU critical section */
+static volatile nrf_802154_mcu_critical_state_t m_mcu_cs;
+
 /**
  * Enter request block.
  *
@@ -187,9 +190,7 @@ static nrf_802154_req_data_t m_requests_queue_memory[REQ_QUEUE_SIZE];
  */
 static nrf_802154_req_data_t * req_enter(void)
 {
-    __disable_irq();
-    __DSB();
-    __ISB();
+    nrf_802154_mcu_critical_enter(m_mcu_cs);
 
     assert(!nrf_802154_queue_is_full(&m_requests_queue));
 
@@ -208,7 +209,7 @@ static void req_exit(void)
 
     nrf_egu_task_trigger(SWI_EGU, REQ_TASK);
 
-    __enable_irq();
+    nrf_802154_mcu_critical_exit(m_mcu_cs);
 }
 
 /** Assert if SWI interrupt is disabled. */

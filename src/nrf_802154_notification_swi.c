@@ -45,6 +45,7 @@
 #include "nrf_802154_peripherals.h"
 #include "nrf_802154_queue.h"
 #include "nrf_802154_swi.h"
+#include "nrf_802154_utils.h"
 #include "nrf_egu.h"
 
 #define SWI_EGU        NRF_802154_SWI_EGU_INSTANCE ///< Label of SWI peripheral.
@@ -133,6 +134,8 @@ typedef struct
 static nrf_802154_queue_t    m_notifications_queue;
 static nrf_802154_ntf_data_t m_notifications_queue_memory[NTF_QUEUE_SIZE];
 
+static volatile nrf_802154_mcu_critical_state_t m_mcu_cs;
+
 /**
  * Enter notify block.
  *
@@ -143,9 +146,7 @@ static nrf_802154_ntf_data_t m_notifications_queue_memory[NTF_QUEUE_SIZE];
  */
 static nrf_802154_ntf_data_t * ntf_enter(void)
 {
-    __disable_irq();
-    __DSB();
-    __ISB();
+    nrf_802154_mcu_critical_enter(m_mcu_cs);
 
     assert(!nrf_802154_queue_is_full(&m_notifications_queue));
 
@@ -164,7 +165,7 @@ static void ntf_exit(void)
 
     nrf_egu_task_trigger(SWI_EGU, NTF_TASK);
 
-    __enable_irq();
+    nrf_802154_mcu_critical_exit(m_mcu_cs);
 }
 
 /**
