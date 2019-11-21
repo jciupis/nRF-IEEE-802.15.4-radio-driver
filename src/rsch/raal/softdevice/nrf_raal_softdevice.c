@@ -338,6 +338,7 @@ static inline void timeslot_data_init(void)
 static inline void timeslot_state_set(timeslot_state_t state)
 {
     m_timeslot_state = state;
+    __DMB();
 }
 
 /**@brief Indicate if timeslot is in the provided state. */
@@ -380,7 +381,7 @@ static void timeslot_request(void)
 {
     timeslot_request_prepare();
 
-    m_timeslot_state = TIMESLOT_STATE_REQUESTED;
+    timeslot_state_set(TIMESLOT_STATE_REQUESTED);
 
     // Request timeslot from SoftDevice.
     uint32_t err_code = sd_radio_request(&m_request);
