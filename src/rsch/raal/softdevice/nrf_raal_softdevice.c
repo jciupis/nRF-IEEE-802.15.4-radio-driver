@@ -347,6 +347,39 @@ static inline bool timeslot_state_is(timeslot_state_t state)
     return (m_timeslot_state == state);
 }
 
+/**@brief Atomically check if timeslot can be requested safely. */
+static bool timeslot_can_be_requested(void)
+{
+    bool                            result = false;
+    nrf_802154_mcu_critical_state_t mcu_cs;
+
+    nrf_802154_mcu_critical_enter(mcu_cs);
+
+    do
+    {
+        // Do not request timeslot if out of continuous mode
+        if (!m_continuous)
+        {
+            break;
+        }
+
+        // Do not request timeslot if its current state is different than IDLE
+        if (!timeslot_state_is(TIMESLOT_STATE_IDLE))
+        {
+            break;
+        }
+
+        // Continuous mode is on and the timeslot is IDLE. Allow for timeslot request
+        timeslot_state_set(TIMESLOT_STATE_REQUESTED);
+        result = true;
+
+    } while (0);
+
+    nrf_802154_mcu_critical_exit(mcu_cs);
+
+    return result;
+}
+
 /**@brief Notify driver that timeslot has been started. */
 static inline void timeslot_started_notify(void)
 {
@@ -381,14 +414,12 @@ static void timeslot_request(void)
 {
     timeslot_request_prepare();
 
-    timeslot_state_set(TIMESLOT_STATE_REQUESTED);
-
     // Request timeslot from SoftDevice.
     uint32_t err_code = sd_radio_request(&m_request);
 
     if (err_code != NRF_SUCCESS)
     {
-        m_timeslot_state = TIMESLOT_STATE_IDLE;
+        timeslot_state_set(TIMESLOT_STATE_IDLE);
     }
 
     nrf_802154_log_local_event(NRF_802154_LOG_VERBOSITY_LOW,
@@ -689,7 +720,7 @@ static void timeslot_busy_handle(void)
 
     timeslot_state_set(TIMESLOT_STATE_IDLE);
 
-    if (m_continuous)
+    if (timeslot_can_be_requested())
     {
         timeslot_request();
     }
@@ -702,7 +733,7 @@ static void timeslot_available_handle(void)
 {
     nrf_802154_log_function_enter(NRF_802154_LOG_VERBOSITY_LOW);
 
-    if (m_continuous && timeslot_state_is(TIMESLOT_STATE_IDLE))
+    if (timeslot_can_be_requested())
     {
         timeslot_data_init();
         timeslot_request();
@@ -877,7 +908,7 @@ void nrf_raal_continuous_mode_enter(void)
 
     m_continuous = true;
 
-    if (timeslot_state_is(TIMESLOT_STATE_IDLE))
+    if (timeslot_can_be_requested())
     {
         timeslot_data_init();
         timeslot_request();
