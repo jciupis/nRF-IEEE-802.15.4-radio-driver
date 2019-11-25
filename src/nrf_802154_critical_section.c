@@ -112,8 +112,8 @@ static bool nested_critical_section_is_allowed_in_this_context(void)
 
 static bool critical_section_enter(bool forced)
 {
-    bool     result = false;
-    uint8_t  cnt;
+    bool    result = false;
+    uint8_t cnt;
 
     if (forced ||
         (m_nested_critical_section_counter == 0) ||

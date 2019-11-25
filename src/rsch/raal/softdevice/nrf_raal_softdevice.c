@@ -168,7 +168,7 @@ static volatile bool m_continuous = false;
 /**@brief Defines if RAAL is currently in a timeslot. */
 static volatile timeslot_state_t m_timeslot_state;
 
-/**@brief Defines if session is currently idle. */
+/**@brief Defines if SoftDevice session is currently idle. */
 static volatile bool m_session_idle;
 
 /**@brief Current action of the timer. */
@@ -602,7 +602,7 @@ static void timeslot_started_handle(void)
 
     assert(timeslot_state_is(TIMESLOT_STATE_REQUESTED));
 
-    // Session is not idle anymore.
+    // Session is not idle anymore
     m_session_idle = false;
 
     // First, set up a timer to fire immediately after leaving the signal handler
