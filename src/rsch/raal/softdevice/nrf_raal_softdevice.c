@@ -168,6 +168,9 @@ static volatile bool m_continuous = false;
 /**@brief Defines if RAAL is currently in a timeslot. */
 static volatile timeslot_state_t m_timeslot_state;
 
+/**@brief Defines if session is currently idle. */
+static volatile bool m_session_idle;
+
 /**@brief Current action of the timer. */
 static timer_action_t m_timer_action;
 
@@ -363,13 +366,19 @@ static bool timeslot_can_be_requested(void)
             break;
         }
 
+        // Do not request timeslot if the session is not idle. Otherwise request will fail
+        if (!m_session_idle)
+        {
+            break;
+        }
+
         // Do not request timeslot if its current state is different than IDLE
         if (!timeslot_state_is(TIMESLOT_STATE_IDLE))
         {
             break;
         }
 
-        // Continuous mode is on and the timeslot is IDLE. Allow for timeslot request
+        // Continuous mode is on, the session and timeslot are idle. Allow for timeslot request
         timeslot_state_set(TIMESLOT_STATE_REQUESTED);
         result = true;
 
@@ -593,6 +602,9 @@ static void timeslot_started_handle(void)
 
     assert(timeslot_state_is(TIMESLOT_STATE_REQUESTED));
 
+    // Session is not idle anymore.
+    m_session_idle = false;
+
     // First, set up a timer to fire immediately after leaving the signal handler
     timer_start();
 
@@ -704,7 +716,7 @@ static void timeslot_extend_succeeded_handle(void)
     if (timeslot_state_is(TIMESLOT_STATE_REQUESTED))
     {
         // Timeslot has been started and extended successfully. Notify the higher layer
-        m_timeslot_state = TIMESLOT_STATE_GRANTED;
+        timeslot_state_set(TIMESLOT_STATE_GRANTED);
         timeslot_started_notify();
     }
 
@@ -720,6 +732,8 @@ static void timeslot_busy_handle(void)
 
     timeslot_state_set(TIMESLOT_STATE_IDLE);
 
+    m_session_idle = true;
+
     if (timeslot_can_be_requested())
     {
         timeslot_request();
@@ -732,6 +746,8 @@ static void timeslot_busy_handle(void)
 static void timeslot_available_handle(void)
 {
     nrf_802154_log_function_enter(NRF_802154_LOG_VERBOSITY_LOW);
+
+    m_session_idle = true;
 
     if (timeslot_can_be_requested())
     {
@@ -858,6 +874,8 @@ void nrf_raal_init(void)
     assert(err_code == NRF_SUCCESS);
     (void)err_code;
 
+    m_session_idle = true;
+
 #if (SD_VERSION == BLE_ADV_SCHED_CFG_SUPPORT_SD_VERSION)
     // Ensure that correct SoftDevice version is flashed.
     if (SD_VERSION_GET(MBR_SIZE) == BLE_ADV_SCHED_CFG_SUPPORT_SD_VERSION)
@@ -931,8 +949,7 @@ void nrf_raal_continuous_mode_exit(void)
         timer_reset();
 
         // Be cautious - most likely this is not an interrupt context
-        m_timeslot_state = TIMESLOT_STATE_DROPPED;
-        __DMB();
+        timeslot_state_set(TIMESLOT_STATE_DROPPED);
 
         nrf_raal_timeslot_ended();
     }
