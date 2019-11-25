@@ -120,6 +120,7 @@ static bool critical_section_enter(bool forced)
         nested_critical_section_is_allowed_in_this_context())
     {
         nrf_802154_mcu_critical_state_t mcu_cs;
+
         nrf_802154_mcu_critical_enter(mcu_cs);
 
         do

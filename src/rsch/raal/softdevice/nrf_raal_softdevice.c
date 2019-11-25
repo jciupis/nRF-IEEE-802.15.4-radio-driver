@@ -381,8 +381,8 @@ static bool timeslot_can_be_requested(void)
         // Continuous mode is on, the session and timeslot are idle. Allow for timeslot request
         timeslot_state_set(TIMESLOT_STATE_REQUESTED);
         result = true;
-
-    } while (0);
+    }
+    while (0);
 
     nrf_802154_mcu_critical_exit(mcu_cs);
 
