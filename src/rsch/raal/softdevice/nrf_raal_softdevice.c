@@ -153,9 +153,6 @@ typedef struct
 /**@brief Defines if module has been initialized. */
 static bool m_initialized = false;
 
-/**@brief Request parameters. */
-static nrf_radio_request_t m_request;
-
 /**@brief Return parameter for SD radio signal handler. */
 static nrf_radio_signal_callback_return_param_t m_ret_param;
 
@@ -358,31 +355,12 @@ static bool timeslot_can_be_requested(void)
 
     nrf_802154_mcu_critical_enter(mcu_cs);
 
-    do
+    if (m_continuous && m_session_idle && timeslot_state_is(TIMESLOT_STATE_IDLE))
     {
-        // Do not request timeslot if out of continuous mode
-        if (!m_continuous)
-        {
-            break;
-        }
-
-        // Do not request timeslot if the session is not idle. Otherwise request will fail
-        if (!m_session_idle)
-        {
-            break;
-        }
-
-        // Do not request timeslot if its current state is different than IDLE
-        if (!timeslot_state_is(TIMESLOT_STATE_IDLE))
-        {
-            break;
-        }
-
         // Continuous mode is on, the session and timeslot are idle. Allow for timeslot request
         timeslot_state_set(TIMESLOT_STATE_REQUESTED);
         result = true;
     }
-    while (0);
 
     nrf_802154_mcu_critical_exit(mcu_cs);
 
@@ -408,23 +386,26 @@ static inline void margin_reached_notify(void)
 }
 
 /**@brief Prepare earliest timeslot request. */
-static void timeslot_request_prepare(void)
+static void timeslot_request_prepare(nrf_radio_request_t * p_request)
 {
-    memset(&m_request, 0, sizeof(m_request));
-    m_request.request_type               = NRF_RADIO_REQ_TYPE_EARLIEST;
-    m_request.params.earliest.hfclk      = NRF_RADIO_HFCLK_CFG_NO_GUARANTEE;
-    m_request.params.earliest.priority   = NRF_RADIO_PRIORITY_NORMAL;
-    m_request.params.earliest.length_us  = m_timeslot_length;
-    m_request.params.earliest.timeout_us = m_config.sd_cfg.timeslot_timeout;
+    memset(p_request, 0, sizeof(nrf_radio_request_t));
+    p_request->request_type               = NRF_RADIO_REQ_TYPE_EARLIEST;
+    p_request->params.earliest.hfclk      = NRF_RADIO_HFCLK_CFG_NO_GUARANTEE;
+    p_request->params.earliest.priority   = NRF_RADIO_PRIORITY_NORMAL;
+    p_request->params.earliest.length_us  = m_timeslot_length;
+    p_request->params.earliest.timeout_us = m_config.sd_cfg.timeslot_timeout;
 }
 
 /**@brief Request earliest timeslot. */
 static void timeslot_request(void)
 {
-    timeslot_request_prepare();
+    nrf_radio_request_t radio_request;
+    uint32_t            err_code;
+
+    timeslot_request_prepare(&radio_request);
 
     // Request timeslot from SoftDevice.
-    uint32_t err_code = sd_radio_request(&m_request);
+    err_code = sd_radio_request(&radio_request);
 
     if (err_code != NRF_SUCCESS)
     {
@@ -433,7 +414,7 @@ static void timeslot_request(void)
 
     nrf_802154_log_local_event(NRF_802154_LOG_VERBOSITY_LOW,
                                NRF_802154_LOG_LOCAL_EVENT_ID_RAAL_TIMESLOT_REQUEST,
-                               m_request.params.earliest.length_us);
+                               radio_request.params.earliest.length_us);
     nrf_802154_log_local_event(NRF_802154_LOG_VERBOSITY_LOW,
                                NRF_802154_LOG_LOCAL_EVENT_ID_RAAL_TIMESLOT_REQUEST_RESULT,
                                err_code);
