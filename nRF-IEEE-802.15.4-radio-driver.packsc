@@ -507,6 +507,14 @@
         ]
     },
 
+    "debug_timestamp": {
+        "_class": "nRF_drv_radio_802_15_4",
+        "_description": "This option add timestamps derived from processor's cycle counter to the logs.",
+        "_defines": [
+            "ENABLE_DEBUG_TIMESTAMP_LOG"
+        ]
+    },
+
     "ndebug": {
         "_class": "nRF_drv_radio_802_15_4",
         "_description": "This option enables NDEBUG compile option that removes asserts.",

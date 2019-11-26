@@ -743,6 +743,7 @@ static void timeslot_available_handle(void)
 /**@brief Signal handler. */
 static nrf_radio_signal_callback_return_param_t * signal_handler(uint8_t signal_type)
 {
+    nrf_802154_log_elapsed_time_start(NRF_802154_LOG_VERBOSITY_LOW);
     nrf_802154_log_function_enter(NRF_802154_LOG_VERBOSITY_LOW);
 
     // Default response.
@@ -787,6 +788,8 @@ static nrf_radio_signal_callback_return_param_t * signal_handler(uint8_t signal_
     }
 
     nrf_802154_log_function_exit(NRF_802154_LOG_VERBOSITY_LOW);
+    nrf_802154_log_elapsed_time_end(NRF_802154_LOG_VERBOSITY_LOW,
+                                    NRF_802154_LOG_LOCAL_EVENT_ID_RAAL_SIGNAL_HANDLER_DURATION);
 
     return &m_ret_param;
 }

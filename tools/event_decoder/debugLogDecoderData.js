@@ -91,6 +91,7 @@ var debugLogDecoderModules = [
         localEvents: [
             {id: 1, text: "TIMESLOT_REQUEST", paramType: "uint"},
             {id: 2, text: "TIMESLOT_REQUEST_RESULT", paramType: "uint"},
+            {id: 3, text: "SIGNAL_HANDLER_DURATION", paramType: "uint"},
         ]
     }
 ];
