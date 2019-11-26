@@ -762,6 +762,40 @@ void nrf_802154_ack_timeout_set(uint32_t time)
 
 #endif // NRF_802154_ACK_TIMEOUT_ENABLED
 
+#if NRF_802154_IFS_ENABLED
+
+nrf_802154_ifs_mode_t nrf_802154_ifs_mode_get(void)
+{
+    return nrf_802154_pib_ifs_mode_get();
+}
+
+bool nrf_802154_ifs_mode_set(nrf_802154_ifs_mode_t mode)
+{
+    return nrf_802154_pib_ifs_mode_set(mode);
+}
+
+uint16_t nrf_802154_ifs_min_sifs_period_get(void)
+{
+    return nrf_802154_pib_ifs_min_sifs_period_get();
+}
+
+void nrf_802154_ifs_min_sifs_period_set(uint16_t period)
+{
+    nrf_802154_pib_ifs_min_sifs_period_set(period);
+}
+
+uint16_t nrf_802154_ifs_min_lifs_period_get(void)
+{
+    return nrf_802154_pib_ifs_min_lifs_period_get();
+}
+
+void nrf_802154_ifs_min_lifs_period_set(uint16_t period)
+{
+    nrf_802154_pib_ifs_min_lifs_period_set(period);
+}
+
+#endif // NRF_802154_IFS_ENABLED
+
 __WEAK void nrf_802154_tx_ack_started(const uint8_t * p_data)
 {
     (void)p_data;
