@@ -170,7 +170,7 @@ bool nrf_802154_ifs_pretransmission(const uint8_t * p_frame, bool cca)
 
     m_context.p_data  = (uint8_t *)p_frame;
     m_context.cca     = cca;
-    m_timer.t0        = current_timestamp;
+    m_timer.t0        = m_last_frame_timestamp;
     m_timer.dt        = dt;
     m_timer.callback  = callback_fired;
     m_timer.p_context = &m_context;
