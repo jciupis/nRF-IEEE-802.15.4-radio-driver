@@ -40,7 +40,8 @@ var debugLogDecoderModules = [
                 {value: 8, text: "CCA"},
                 {value: 9, text: "CONTINUOUS_CARRIER"},
                 {value: 10, text: "MODULATED_CARRIER"}
-            ]}
+            ]},
+            {id: 3, text: "RECEIVED_TIMESTAMP", paramType: "uint"},
         ]
     },
     {
@@ -67,7 +68,11 @@ var debugLogDecoderModules = [
     },
     {
         id: 6,
-        name: "TRX"
+        name: "TRX",
+        localEvents: [
+            {id: 2, text: "WAIT_UNTIL_DISABLED", paramType: "uint"},
+            {id: 4, text: "CRCOK_TIMESTAMP", paramType: "uint"},
+        ]
     },
     {
         id: 7,

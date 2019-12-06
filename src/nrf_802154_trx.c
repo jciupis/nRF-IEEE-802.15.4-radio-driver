@@ -1323,6 +1323,7 @@ static inline void wait_until_radio_is_disabled(void)
 {
     nrf_802154_log_function_enter(NRF_802154_LOG_VERBOSITY_HIGH);
 
+    // SUSPECT
     while (nrf_radio_state_get() != NRF_RADIO_STATE_DISABLED)
     {
         /* Intentionally empty */
@@ -1427,8 +1428,11 @@ static void rxframe_finish(void)
      * RADIO will not ramp up, as PPI_EGU_RAMP_UP channel is self-disabling, and
      * it was disabled when receive ramp-up was started.
      */
+    nrf_802154_log_elapsed_time_start(NRF_802154_LOG_VERBOSITY_LOW);
     wait_until_radio_is_disabled(); // This includes waiting since CRCOK/CRCERROR (several cycles) event until END
                                     // and then during RXDISABLE state (0.5us)
+    nrf_802154_log_elapsed_time_end(NRF_802154_LOG_VERBOSITY_LOW,
+                                    NRF_802154_LOG_LOCAL_EVENT_ID_WAIT_UNTIL_DISABLED_DURATION);
 
     ppi_and_egu_delay_wait();
 
@@ -2070,9 +2074,15 @@ static void irq_handler_crcok(void)
     {
         case TRX_STATE_RXFRAME:
             m_flags.rssi_started = true;
+            nrf_802154_log_timestamp_raw(NRF_802154_LOG_VERBOSITY_LOW,
+                                         NRF_802154_LOG_LOCAL_EVENT_ID_CRCOK_TIMESTAMP);
             rxframe_finish();
+            nrf_802154_log_timestamp_raw(NRF_802154_LOG_VERBOSITY_LOW,
+                                         NRF_802154_LOG_LOCAL_EVENT_ID_CRCOK_TIMESTAMP);
             m_trx_state = TRX_STATE_RXFRAME_FINISHED;
             nrf_802154_trx_receive_frame_received();
+            nrf_802154_log_timestamp_raw(NRF_802154_LOG_VERBOSITY_LOW,
+                                         NRF_802154_LOG_LOCAL_EVENT_ID_CRCOK_TIMESTAMP);
             break;
 
         case TRX_STATE_RXACK:

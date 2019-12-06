@@ -229,6 +229,7 @@ extern volatile uint32_t nrf_802154_debug_log_ptr;
 
 #define nrf_802154_log_elapsed_time_start(verbosity)
 #define nrf_802154_log_elapsed_time_end(verbosity, local_event_id)
+#define nrf_802154_log_timestamp_raw(verbosity, local_event_id)
 
 #else
 
@@ -243,7 +244,19 @@ extern volatile uint32_t nrf_802154_debug_log_ptr;
                                                                                                  \
         nrf_802154_log_local_event(verbosity, local_event_id, logged_cyc);                       \
     }                                                                                            \
-    while (0);
+    while (0)
+
+#define nrf_802154_log_timestamp_raw(verbosity, local_event_id)      \
+    do                                                               \
+    {                                                                \
+        uint32_t cyccnt = DWT->CYCCNT;                               \
+        uint16_t low    = cyccnt & 0x0000FFFF;                       \
+        uint16_t high   = (cyccnt & 0xFFFF0000) >> 16;               \
+        nrf_802154_log_local_event(verbosity, local_event_id, high); \
+        nrf_802154_log_local_event(verbosity, local_event_id, low);  \
+    } while (0)
+
+    
 
 #endif
 

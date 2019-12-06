@@ -1593,7 +1593,11 @@ void nrf_802154_trx_receive_frame_received(void)
         }
         else
         {
+            nrf_802154_log_timestamp_raw(NRF_802154_LOG_VERBOSITY_LOW,
+                                         NRF_802154_LOG_LOCAL_EVENT_ID_RECEIVED_TIMESTAMP);
             request_preconditions_for_state(m_state);
+            nrf_802154_log_timestamp_raw(NRF_802154_LOG_VERBOSITY_LOW,
+                                         NRF_802154_LOG_LOCAL_EVENT_ID_RECEIVED_TIMESTAMP);
             // Filter out received ACK frame if promiscuous mode is disabled.
             if (((p_received_data[FRAME_TYPE_OFFSET] & FRAME_TYPE_MASK) != FRAME_TYPE_ACK) ||
                 nrf_802154_pib_promiscuous_get())
