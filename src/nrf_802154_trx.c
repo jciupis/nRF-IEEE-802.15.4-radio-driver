@@ -1323,10 +1323,15 @@ static inline void wait_until_radio_is_disabled(void)
 {
     nrf_802154_log_function_enter(NRF_802154_LOG_VERBOSITY_HIGH);
 
-    // SUSPECT
+    uint32_t i = 0;
     while (nrf_radio_state_get() != NRF_RADIO_STATE_DISABLED)
     {
-        /* Intentionally empty */
+        // This loop is expected to execute no longer than RX ramp-down time, which is equal
+        // approximately 0.5us. Taking a bold assumption that a single iteration of the loop
+        // takes one cycle to complete, 64 iterations would amount to 1 us of execution time,
+        // which is double the expected time. Hence the below assert
+        assert(i < 64);
+        i++;
     }
 
     nrf_802154_log_function_exit(NRF_802154_LOG_VERBOSITY_HIGH);
