@@ -250,6 +250,17 @@ static nrf_802154_flags_t m_flags; ///< Flags used to store the current driver s
 static volatile uint32_t m_timer_value_on_radio_end_event;
 static volatile bool     m_transmit_with_cca;
 
+#ifndef NRF52811_XXAA
+static uint32_t m_radio_array[sizeof(NRF_RADIO_Type) / sizeof(uint32_t)];
+static volatile NRF_RADIO_Type * m_radio_registers = (NRF_RADIO_Type *)m_radio_array;
+
+static uint32_t m_timer_array[sizeof(NRF_TIMER_Type) / sizeof(uint32_t)];
+static volatile NRF_TIMER_Type * m_timer_registers = (NRF_TIMER_Type *)m_timer_array;
+
+static uint32_t m_ppi_array[sizeof(NRF_PPI_Type) / sizeof(uint32_t)];
+static volatile NRF_PPI_Type * m_ppi_registers = (NRF_PPI_Type *)m_ppi_array;
+#endif
+
 static void go_idle_abort(void);
 static void receive_frame_abort(void);
 static void receive_ack_abort(void);
@@ -1326,11 +1337,24 @@ static inline void wait_until_radio_is_disabled(void)
     uint32_t i = 0;
     while (nrf_radio_state_get() != NRF_RADIO_STATE_DISABLED)
     {
-        // This loop is expected to execute no longer than RX ramp-down time, which is equal
-        // approximately 0.5us. Taking a bold assumption that a single iteration of the loop
-        // takes one cycle to complete, 64 iterations would amount to 1 us of execution time,
-        // which is double the expected time. Hence the below assert
-        assert(i < 64);
+        if (i == 64)
+        {
+#ifndef NRF52811_XXAA
+            memcpy(m_radio_array, NRF_RADIO, sizeof(NRF_RADIO_Type));
+            memcpy(m_timer_array, NRF_TIMER0, sizeof(NRF_TIMER_Type));
+            memcpy(m_ppi_array, NRF_PPI, sizeof(NRF_PPI_Type));
+
+            (void)m_radio_registers;
+            (void)m_timer_registers;
+            (void)m_ppi_registers;
+#endif
+            // This loop is expected to execute no longer than RX ramp-down time, which is equal
+            // approximately 0.5us. Taking a bold assumption that a single iteration of the loop
+            // takes one cycle to complete, 64 iterations would amount to 1 us of execution time,
+            // which is double the expected time. Hence the below assert
+            assert(false);
+        }
+
         i++;
     }
 
