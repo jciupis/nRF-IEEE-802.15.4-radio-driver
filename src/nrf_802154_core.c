@@ -1192,6 +1192,26 @@ static void on_timeslot_started(void)
     nrf_802154_log_function_exit(NRF_802154_LOG_VERBOSITY_LOW);
 }
 
+static bool preconditions_approved_should_be_ignored(rsch_prio_t previously_approved_prio,
+                                                     rsch_prio_t currently_approved_prio)
+{
+    // Approved preconditions should only be ignored only all the following conditions are met:
+    //   * all preconditions apart from Coex had already been approved;
+    //   * the call is a result of Coex becoming approved at the highest priority;
+    //   * currently performed operation is transmission with CCA;
+    //   * Coex for transmission is requested after CCA reports idle channel
+    bool only_coex_was_unapproved       = (previously_approved_prio == RSCH_PRIO_RX);
+    bool all_preconditions_are_approved = (currently_approved_prio == RSCH_PRIO_MAX);
+    bool current_state_is_cca_tx        = (m_state == RADIO_STATE_CCA_TX);
+    bool coex_tx_request_mode_allows    = (m_coex_tx_request_mode ==
+                                           NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE);
+
+    return (only_coex_was_unapproved &&
+            all_preconditions_are_approved &&
+            current_state_is_cca_tx &&
+            coex_tx_request_mode_allows);
+}
+
 void nrf_802154_rsch_crit_sect_prio_changed(rsch_prio_t prio)
 {
     rsch_prio_t old_prio = m_rsch_priority;
@@ -1234,7 +1254,10 @@ void nrf_802154_rsch_crit_sect_prio_changed(rsch_prio_t prio)
     }
     else
     {
-        on_preconditions_approved(m_state);
+        if (!preconditions_approved_should_be_ignored(old_prio, prio))
+        {
+            on_preconditions_approved(m_state);
+        }
     }
 }
 
