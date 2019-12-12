@@ -1103,15 +1103,12 @@ static void on_preconditions_denied(radio_state_t state)
 
         case RADIO_STATE_TX_ACK:
             state_set(RADIO_STATE_RX);
-            mp_current_rx_buffer->free = false;
-            received_frame_notify_and_nesting_allow(mp_current_rx_buffer->data);
             break;
 
         case RADIO_STATE_CCA_TX:
         case RADIO_STATE_TX:
         case RADIO_STATE_RX_ACK:
             state_set(RADIO_STATE_RX);
-            transmit_failed_notify_and_nesting_allow(NRF_802154_TX_ERROR_ABORTED);
             break;
 
         case RADIO_STATE_ED:
