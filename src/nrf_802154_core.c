@@ -121,6 +121,7 @@ typedef struct
     bool frame_filtered        : 1;                           ///< If frame being received passed filtering operation.
     bool rx_timeslot_requested : 1;                           ///< If timeslot for the frame being received is already requested.
     bool tx_with_cca           : 1;                           ///< If currently transmitted frame is transmitted with cca.
+    bool tx_diminished_prio    : 1;                           ///< If priority of the current transmission should be diminished.
 } nrf_802154_flags_t;
 
 static nrf_802154_flags_t m_flags;                            ///< Flags used to store the current driver state.
@@ -522,13 +523,13 @@ static rsch_prio_t min_required_rsch_prio(radio_state_t state)
             return RSCH_PRIO_TX;
 
         case RADIO_STATE_CCA_TX:
-            if (m_coex_tx_request_mode != NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE)
+            if (m_flags.tx_diminished_prio)
             {
-                return RSCH_PRIO_TX;
+                return RSCH_PRIO_IDLE_LISTENING;
             }
             else
             {
-                return RSCH_PRIO_IDLE_LISTENING;
+                return RSCH_PRIO_TX;
             }
 
         default:
@@ -1106,6 +1107,9 @@ static void on_preconditions_denied(radio_state_t state)
             break;
 
         case RADIO_STATE_CCA_TX:
+            m_flags.tx_diminished_prio = false;
+            // Fallthrough
+
         case RADIO_STATE_TX:
         case RADIO_STATE_RX_ACK:
             state_set(RADIO_STATE_RX);
@@ -1684,6 +1688,8 @@ void nrf_802154_trx_transmit_frame_transmitted(void)
 
     if (m_flags.tx_with_cca)
     {
+        m_flags.tx_diminished_prio = false;
+
         // We calculate the timestamp when ccaidle must happened.
         ts -= nrf_802154_frame_duration_get(mp_tx_data[0], true, true) + RX_TX_TURNAROUND_TIME;
 
@@ -1899,6 +1905,7 @@ void nrf_802154_trx_transmit_frame_ccaidle(void)
     if (m_coex_tx_request_mode == NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE)
     {
         nrf_802154_rsch_crit_sect_prio_request(RSCH_PRIO_TX);
+        m_flags.tx_diminished_prio = false;
     }
 
     nrf_802154_log_function_exit(NRF_802154_LOG_VERBOSITY_LOW);
@@ -2100,6 +2107,8 @@ bool nrf_802154_core_transmit(nrf_802154_term_t              term_lvl,
                 m_coex_tx_request_mode                  = nrf_802154_pib_coex_tx_request_mode_get();
                 m_trx_transmit_frame_notifications_mask =
                     make_trx_frame_transmit_notification_mask(cca);
+                m_flags.tx_diminished_prio              =
+                    m_coex_tx_request_mode == NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE;
 
                 state_set(cca ? RADIO_STATE_CCA_TX : RADIO_STATE_TX);
                 mp_tx_data = p_data;
