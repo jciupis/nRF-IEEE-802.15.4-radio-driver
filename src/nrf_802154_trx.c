@@ -1337,6 +1337,9 @@ static inline void wait_until_radio_is_disabled(void)
     uint32_t i = 0;
     while (nrf_radio_state_get() != NRF_RADIO_STATE_DISABLED)
     {
+        // If this PPI is enabled, RADIO might change state to RX spontaneously
+        assert(nrf_ppi_channel_enable_get(PPI_EGU_RAMP_UP) == NRF_PPI_CHANNEL_DISABLED);
+
         if (i == 64)
         {
 #ifndef NRF52811_XXAA
@@ -2485,6 +2488,8 @@ void nrf_802154_radio_irq_handler(void)
     if (nrf_radio_int_enable_check(NRF_RADIO_INT_CRCOK_MASK) &&
         nrf_radio_event_check(NRF_RADIO_EVENT_CRCOK))
     {
+        assert(nrf_ppi_channel_enable_get(PPI_EGU_RAMP_UP) == NRF_PPI_CHANNEL_DISABLED);
+
         nrf_radio_event_clear(NRF_RADIO_EVENT_CRCOK);
 
         irq_handler_crcok();
