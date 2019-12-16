@@ -2211,6 +2211,7 @@ static void transmit_frame_abort(void)
 #endif
     m_flags.missing_receive_buffer = false;
 
+    nrf_radio_task_trigger(NRF_RADIO_TASK_CCASTOP);
     nrf_radio_task_trigger(NRF_RADIO_TASK_DISABLE);
 
     m_trx_state = TRX_STATE_FINISHED;
