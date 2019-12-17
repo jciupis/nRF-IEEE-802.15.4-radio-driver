@@ -148,6 +148,7 @@
 
 #define TXRU_TIME             40       ///< Transmitter ramp up time [us]
 #define EVENT_LAT             23       ///< END event latency [us]
+#define MAX_RXRAMPDOWN_CYCLES 32       ///< Maximum number of cycles that RX ramp-down might take
 
 typedef enum
 {
@@ -1323,10 +1324,23 @@ static inline void wait_until_radio_is_disabled(void)
 {
     nrf_802154_log_function_enter(NRF_802154_LOG_VERBOSITY_HIGH);
 
-    while (nrf_radio_state_get() != NRF_RADIO_STATE_DISABLED)
+    bool radio_is_disabled = false;
+
+    // RADIO should enter DISABLED state after no longer than RX ramp-down time, which is equal
+    // approximately 0.5us. Taking a bold assumption that a single iteration of the loop takes
+    // one cycle to complete, 32 iterations would amount to exactly 0.5 us of execution time.
+    // Please note that this approach ignores software latency completely, i.e. RADIO should
+    // have changed state already before entering this function due to ISR processing delays.
+    for (uint32_t i = 0; i < MAX_RXRAMPDOWN_CYCLES; i++)
     {
-        /* Intentionally empty */
+        if (nrf_radio_state_get() == NRF_RADIO_STATE_DISABLED)
+        {
+            radio_is_disabled = true;
+            break;
+        }
     }
+
+    assert(radio_is_disabled);
 
     nrf_802154_log_function_exit(NRF_802154_LOG_VERBOSITY_HIGH);
 }
