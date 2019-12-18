@@ -1108,7 +1108,7 @@ static void on_preconditions_denied(radio_state_t state)
 
         case RADIO_STATE_CCA_TX:
             m_flags.tx_diminished_prio = false;
-            // Fallthrough
+        // Fallthrough
 
         case RADIO_STATE_TX:
         case RADIO_STATE_RX_ACK:
@@ -1196,10 +1196,10 @@ static bool preconditions_approved_should_be_ignored(rsch_prio_t previously_appr
                                                      rsch_prio_t currently_approved_prio)
 {
     // Approved preconditions should only be ignored only all the following conditions are met:
-    //   * all preconditions apart from Coex had already been approved;
-    //   * the call is a result of Coex becoming approved at the highest priority;
-    //   * currently performed operation is transmission with CCA;
-    //   * Coex for transmission is requested after CCA reports idle channel
+    // * all preconditions apart from Coex had already been approved;
+    // * the call is a result of Coex becoming approved at the highest priority;
+    // * currently performed operation is transmission with CCA;
+    // * Coex for transmission is requested after CCA reports idle channel
     bool only_coex_was_unapproved       = (previously_approved_prio == RSCH_PRIO_RX);
     bool all_preconditions_are_approved = (currently_approved_prio == RSCH_PRIO_MAX);
     bool current_state_is_cca_tx        = (m_state == RADIO_STATE_CCA_TX);
@@ -2130,7 +2130,7 @@ bool nrf_802154_core_transmit(nrf_802154_term_t              term_lvl,
                 m_coex_tx_request_mode                  = nrf_802154_pib_coex_tx_request_mode_get();
                 m_trx_transmit_frame_notifications_mask =
                     make_trx_frame_transmit_notification_mask(cca);
-                m_flags.tx_diminished_prio              =
+                m_flags.tx_diminished_prio =
                     m_coex_tx_request_mode == NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE;
 
                 state_set(cca ? RADIO_STATE_CCA_TX : RADIO_STATE_TX);
