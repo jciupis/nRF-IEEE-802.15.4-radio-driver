@@ -1341,6 +1341,7 @@ static inline void wait_until_radio_is_disabled(void)
     }
 
     assert(radio_is_disabled);
+    (void)radio_is_disabled;
 
     nrf_802154_log_function_exit(NRF_802154_LOG_VERBOSITY_HIGH);
 }
