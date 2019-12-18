@@ -108,6 +108,7 @@ var debugLogDecoderModules = [
 //        text (string) - text to be displayed as enum value
 
 var debugLogDecoderGlobalEvents = [
-    { id: 1, text: "RADIO_RESET" }
+    { id: 1, text: "RADIO_RESET" },
+    { id: 2, text: "TIMESTAMP_RAW", paramType: "uint" }
 ];
 

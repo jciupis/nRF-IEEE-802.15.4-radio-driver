@@ -68,5 +68,6 @@
 
 // Global events
 #define NRF_802154_LOG_GLOBAL_EVENT_ID_RADIO_RESET                 1U
+#define NRF_802154_LOG_GLOBAL_EVENT_TIMESTAMP_RAW                  2U
 
 #endif /* NRF_802154_DEBUG_LOG_CODES_H_ */

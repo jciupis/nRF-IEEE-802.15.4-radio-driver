@@ -225,4 +225,39 @@ extern volatile uint32_t nrf_802154_debug_log_ptr;
     }                                                                                      \
     while (0)
 
+#if !defined(ENABLE_DEBUG_TIMESTAMP_LOG)
+
+#define nrf_802154_log_elapsed_time_start(verbosity)
+#define nrf_802154_log_elapsed_time_end(verbosity, global_event_id)
+#define nrf_802154_log_timestamp_raw(verbosity, global_event_id)
+
+#else /* ENABLE_DEBUG_TIMESTAMP_LOG */
+
+#define nrf_802154_log_elapsed_time_start(verbosity) \
+    uint32_t latch_cyccnt = DWT->CYCCNT;
+
+#define nrf_802154_log_elapsed_time_end(verbosity, local_event_id)                           \
+    do                                                                                       \
+    {                                                                                        \
+        uint32_t elapsed_cyc = (DWT->CYCCNT - latch_cyccnt);                                 \
+        uint16_t logged_cyc  = (elapsed >= UINT16_MAX) ? UINT16_MAX : (uint16_t)elapsed_cyc; \
+                                                                                             \
+        nrf_802154_log_local_event(verbosity, local_event_id, logged_cyc)                    \
+    }                                                                                        \
+    while (0)
+
+#define nrf_802154_log_timestamp_raw(verbosity)                                                  \
+    do                                                                                           \
+    {                                                                                            \
+        uint32_t cyccnt = DWT->CYCCNT;                                                           \
+        uint16_t low    = (cyccnt & 0x0000FFFF);                                                 \
+        uint16_t high   = (cyccnt & 0xFFFF0000) >> 16;                                           \
+                                                                                                 \
+        nrf_802154_log_global_event(verbosity, NRF_802154_LOG_GLOBAL_EVENT_TIMESTAMP_RAW, high); \
+        nrf_802154_log_global_event(verbosity, NRF_802154_LOG_GLOBAL_EVENT_TIMESTAMP_RAW, low);  \
+    }                                                                                            \
+    while (0)
+
+#endif /* ENABLE_DEBUG_TIMESTAMP_LOG */
+
 #endif /* NRF_802154_DEBUG_LOG_H_ */
