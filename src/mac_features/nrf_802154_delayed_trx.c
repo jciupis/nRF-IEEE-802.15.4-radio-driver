@@ -57,9 +57,9 @@
 
 /* The following time is the sum of 70us RTC_IRQHandler processing time, 40us of time that elapses
  * from the moment a board starts transmission to the moment other boards (e.g. sniffer) are able
- * to detect that frame and in case of TX - 50us that accounts for a delay of yet unknown origin.
+ * to detect that frame and in case of TX - 93us that accounts for a delay of yet unknown origin.
  */
-#define TX_SETUP_TIME 160u ///< Time needed to prepare TX procedure [us]. It does not include TX ramp-up time.
+#define TX_SETUP_TIME 203u ///< Time needed to prepare TX procedure [us]. It does not include TX ramp-up time.
 #define RX_SETUP_TIME 110u ///< Time needed to prepare RX procedure [us]. It does not include RX ramp-up time.
 
 /**
