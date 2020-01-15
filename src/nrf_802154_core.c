@@ -1518,6 +1518,9 @@ uint8_t nrf_802154_trx_receive_frame_bcmatched(uint8_t bcc)
 
             frame_accepted = false;
 
+            /* Release boosted preconditions */
+            request_preconditions_for_state(m_state);
+
             if ((mp_current_rx_buffer->data[FRAME_TYPE_OFFSET] & FRAME_TYPE_MASK) !=
                 FRAME_TYPE_ACK)
             {
